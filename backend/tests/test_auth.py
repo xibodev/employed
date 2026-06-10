@@ -166,3 +166,63 @@ def test_logout_with_null_refresh_token_still_returns_200(client):
 def test_logout_with_invalid_token_still_returns_200(client):
     response = client.post("/auth/logout", json={"refresh_token": "not-a-jwt"})
     assert response.status_code == 200
+
+
+def test_verification_email_links_to_frontend_page(client, monkeypatch):
+    """EMP-004 regression: emailed links must land on the frontend
+    /verify-email/[token] page, not the POST-only API route (405 on GET)."""
+    from app.config import settings as app_settings
+
+    captured: dict[str, str] = {}
+
+    def fake_send_verification_email(email: str, url: str) -> None:
+        captured["url"] = url
+
+    monkeypatch.setattr(app_settings, "frontend_base_url", "https://employed.example")
+    monkeypatch.setattr("app.routers.auth.send_verification_email", fake_send_verification_email)
+
+    response = client.post(
+        "/auth/register",
+        json={"email": "linkcheck@example.com", "password": "password123", "name": "Link Check"},
+    )
+
+    assert response.status_code == 201
+    assert captured["url"].startswith("https://employed.example/verify-email/")
+    assert "/auth/" not in captured["url"]
+
+
+def test_password_reset_email_links_to_frontend_page(client, test_user, monkeypatch):
+    from app.config import settings as app_settings
+
+    captured: dict[str, str] = {}
+
+    def fake_send_password_reset_email(email: str, url: str) -> None:
+        captured["url"] = url
+
+    monkeypatch.setattr(app_settings, "frontend_base_url", "https://employed.example")
+    monkeypatch.setattr("app.routers.auth.send_password_reset_email", fake_send_password_reset_email)
+
+    response = client.post("/auth/forgot-password", json={"email": test_user.email})
+
+    assert response.status_code == 200
+    assert captured["url"].startswith("https://employed.example/reset-password/")
+    assert "/auth/" not in captured["url"]
+
+
+def test_email_link_base_falls_back_to_app_base_url(client, monkeypatch):
+    from app.config import settings as app_settings
+
+    captured: dict[str, str] = {}
+    monkeypatch.setattr(app_settings, "frontend_base_url", None)
+    monkeypatch.setattr(app_settings, "app_base_url", "https://app.employed.example/")
+    monkeypatch.setattr(
+        "app.routers.auth.send_verification_email", lambda email, url: captured.__setitem__("url", url)
+    )
+
+    response = client.post(
+        "/auth/register",
+        json={"email": "fallback@example.com", "password": "password123", "name": "Fallback"},
+    )
+
+    assert response.status_code == 201
+    assert captured["url"].startswith("https://app.employed.example/verify-email/")

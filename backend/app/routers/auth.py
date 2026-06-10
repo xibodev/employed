@@ -21,6 +21,7 @@ from app.auth.jwt import (
 from app.auth.oauth import authorize_redirect_url, exchange_code
 from app.auth.passwords import hash_password, verify_password
 from app.auth.revocation import is_revoked, revoke_jti
+from app.config import settings
 from app.database import get_db
 from app.middleware.rate_limit import rate_limit
 from app.schemas.auth import (
@@ -102,6 +103,21 @@ failed_login_tracker = FailedLoginTracker()
 
 def _user_model():
     return resolve_model("User")
+
+
+def _frontend_base_url(request: Request) -> str:
+    """Base URL for links sent in emails (EMP-004).
+
+    Email links must land on the frontend pages (/verify-email/[token],
+    /reset-password/[token]) — the API routes with those tokens are
+    POST-only and return 405 on the GET an email client performs.
+    Resolution order: FRONTEND_BASE_URL, APP_BASE_URL, then the request
+    base URL as a last-resort development fallback.
+    """
+    base = getattr(settings, "frontend_base_url", None) or getattr(settings, "app_base_url", None)
+    if base:
+        return str(base).rstrip("/")
+    return str(request.base_url).rstrip("/")
 
 
 def _user_to_read(user: Any) -> UserRead:
@@ -219,7 +235,7 @@ def register(payload: RegisterRequest, request: Request, db: Any = Depends(get_d
     _set_local_user_fields(user, email, payload.name, payload.password)
     saved = save(db, user)
     token = create_verification_token(str(get_user_id(saved)), email)
-    verify_url = str(request.base_url).rstrip("/") + f"/auth/verify-email/{token}"
+    verify_url = f"{_frontend_base_url(request)}/verify-email/{token}"
     send_verification_email(email, verify_url)
     return _registration_response()
 
@@ -326,7 +342,7 @@ def forgot_password(payload: ForgotPasswordRequest, request: Request, db: Any = 
     user = _find_user_by_email(db, payload.email)
     if user is not None:
         token = create_password_reset_token(str(get_user_id(user)), payload.email.strip().lower())
-        reset_url = str(request.base_url).rstrip("/") + f"/auth/reset-password/{token}"
+        reset_url = f"{_frontend_base_url(request)}/reset-password/{token}"
         send_password_reset_email(payload.email.strip().lower(), reset_url)
     return MessageResponse(message="If an account exists for that email, a reset link has been sent")
 
