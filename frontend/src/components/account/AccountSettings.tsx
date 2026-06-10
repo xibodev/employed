@@ -8,6 +8,7 @@ type AccountUser = AuthUser & {
   name?: string;
   email?: string;
   emails?: Array<{ address?: string; verified?: boolean }>;
+  email_verified?: boolean;
   emailVerified?: boolean;
   deletionScheduledFor?: string;
 };

@@ -32,6 +32,9 @@ interface AuthActions {
 type AuthContextValue = AuthState & AuthActions;
 type AppUser = AuthUser & {
   isAdmin?: boolean;
+  /** Snake_case field as returned by the API (/users/me, /auth/login). */
+  email_verified?: boolean;
+  /** Legacy camelCase variant kept for backward compatibility. */
   emailVerified?: boolean;
   deletionRequestedAt?: string;
   deletionScheduledFor?: string;
@@ -141,6 +144,12 @@ function isAdminUser(user: AppUser | null) {
 function isVerifiedUser(user: AppUser | null) {
   if (!user) {
     return false;
+  }
+
+  // EMP-029: the API returns snake_case email_verified; reading only the
+  // camelCase variant showed every verified user as "Pending verification".
+  if (typeof user.email_verified === "boolean") {
+    return user.email_verified;
   }
 
   if (typeof user.emailVerified === "boolean") {

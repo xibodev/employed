@@ -8,6 +8,7 @@ import { apiFetch } from "@/lib/api";
 import type { AuthUser } from "@/lib/types";
 
 type AccountUser = AuthUser & {
+  email_verified?: boolean;
   emailVerified?: boolean;
   deletionScheduledFor?: string;
 };
