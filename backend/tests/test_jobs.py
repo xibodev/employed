@@ -196,3 +196,53 @@ def test_job_count_endpoint_returns_correct_total(client, job_factory, sample_ma
 
     assert response.status_code == 200
     assert response.json()["total"] == 2
+
+
+def test_recaptcha_secret_resolves_from_settings(monkeypatch):
+    """EMP-002 regression: the secret must resolve from the snake_case
+    pydantic Settings field (alias RECAPTCHA_SECRET_KEY)."""
+    from app.config import settings as app_settings
+    from app.routers.jobs import _recaptcha_setting
+
+    monkeypatch.setattr(app_settings, "recaptcha_secret_key", "probe-secret")
+
+    assert _recaptcha_setting("RECAPTCHA_V3_SECRET_KEY", "RECAPTCHA_SECRET_KEY") == "probe-secret"
+
+
+def test_recaptcha_secret_resolves_from_environment(monkeypatch):
+    from app.config import settings as app_settings
+    from app.routers.jobs import _recaptcha_setting
+
+    monkeypatch.setattr(app_settings, "recaptcha_secret_key", None)
+    monkeypatch.setenv("RECAPTCHA_V3_SECRET_KEY", "env-probe-secret")
+
+    assert _recaptcha_setting("RECAPTCHA_V3_SECRET_KEY", "RECAPTCHA_SECRET_KEY") == "env-probe-secret"
+
+
+def test_recaptcha_action_contract_accepts_submit_job(monkeypatch):
+    """EMP-003 regression: backend accepts the action the frontend widget
+    sends ('submit_job') and rejects the legacy mismatched names."""
+    from app.routers.jobs import _recaptcha_accepts
+
+    assert _recaptcha_accepts({"success": True, "action": "submit_job", "score": 0.9}) is True
+    assert _recaptcha_accepts({"success": True, "action": None, "score": 0.9}) is True
+    assert _recaptcha_accepts({"success": True, "action": "create_job", "score": 0.9}) is False
+    assert _recaptcha_accepts({"success": True, "action": "edit_job", "score": 0.9}) is False
+    assert _recaptcha_accepts({"success": True, "action": "submit_job", "score": 0.1}) is False
+    assert _recaptcha_accepts({"success": False, "action": "submit_job", "score": 0.9}) is False
+
+
+def test_recaptcha_bypass_only_in_development(monkeypatch):
+    from app.config import settings as app_settings
+    from app.routers.jobs import _recaptcha_bypass_enabled
+
+    monkeypatch.setattr(app_settings, "recaptcha_bypass_in_development", True)
+    monkeypatch.setattr(app_settings, "environment", "development")
+    assert _recaptcha_bypass_enabled() is True
+
+    monkeypatch.setattr(app_settings, "environment", "production")
+    assert _recaptcha_bypass_enabled() is False
+
+    monkeypatch.setattr(app_settings, "recaptcha_bypass_in_development", False)
+    monkeypatch.setattr(app_settings, "environment", "development")
+    assert _recaptcha_bypass_enabled() is False

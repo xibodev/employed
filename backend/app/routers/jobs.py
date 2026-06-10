@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import random
 from datetime import timedelta
 from typing import Any
@@ -163,10 +164,45 @@ def _assert_job_owner_or_admin(job: Any, user: Any) -> None:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You can only modify your own job")
 
 
+# Action name contract shared with the frontend RecaptchaWidget (EMP-003).
+RECAPTCHA_ACTION = "submit_job"
+
+
+def _recaptcha_setting(*names: str, default: Any = None) -> Any:
+    """Resolve a reCAPTCHA setting from pydantic Settings or the environment.
+
+    EMP-002: the previous getattr(settings, 'RECAPTCHA_SECRET_KEY') lookups
+    could never match the snake_case pydantic fields, so the secret was
+    unreadable and anonymous job submission always failed. Mirrors the
+    _setting helpers used by main.py and the webhook adapters.
+    """
+    for name in names:
+        value = getattr(settings, name, getattr(settings, name.lower(), None))
+        if value not in (None, ""):
+            return value
+        env_value = os.getenv(name)
+        if env_value not in (None, ""):
+            return env_value
+    return default
+
+
+def _recaptcha_bypass_enabled() -> bool:
+    flag = _recaptcha_setting("RECAPTCHA_BYPASS_IN_DEVELOPMENT", default=False)
+    enabled = str(flag).strip().lower() in {"1", "true", "yes", "on"}
+    environment = str(getattr(settings, "environment", "development") or "development").strip().lower()
+    return enabled and environment in {"development", "dev", "testing", "test"}
+
+
+def _recaptcha_accepts(data: dict) -> bool:
+    min_score = float(_recaptcha_setting("RECAPTCHA_MIN_SCORE", default=0.5))
+    action = data.get("action")
+    return bool(data.get("success")) and action in (None, RECAPTCHA_ACTION) and float(data.get("score", 0)) >= min_score
+
+
 async def _verify_recaptcha(token: str | None, request: Request) -> bool:
-    if getattr(settings, "RECAPTCHA_BYPASS_IN_DEVELOPMENT", False):
+    if _recaptcha_bypass_enabled():
         return True
-    secret = getattr(settings, "RECAPTCHA_V3_SECRET_KEY", None) or getattr(settings, "RECAPTCHA_SECRET_KEY", None)
+    secret = _recaptcha_setting("RECAPTCHA_V3_SECRET_KEY", "RECAPTCHA_SECRET_KEY")
     if not secret or not token:
         return False
     async with httpx.AsyncClient(timeout=15) as client:
@@ -179,12 +215,7 @@ async def _verify_recaptcha(token: str | None, request: Request) -> bool:
             },
         )
         response.raise_for_status()
-        data = response.json()
-        min_score = float(getattr(settings, "RECAPTCHA_MIN_SCORE", 0.5))
-        action = data.get("action")
-        return (
-            bool(data.get("success")) and (action in (None, "submit_job")) and float(data.get("score", 0)) >= min_score
-        )
+        return _recaptcha_accepts(response.json())
 
 
 def _payload_values(payload: Any, **kwargs) -> dict:

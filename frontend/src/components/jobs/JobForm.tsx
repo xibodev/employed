@@ -147,7 +147,8 @@ export default function JobForm({ mode, job }: { mode: "create" | "edit"; job?: 
 
   return (
     <>
-      <RecaptchaWidget action={mode === "edit" ? "edit_job" : "create_job"} refreshKey={recaptchaRefresh} onVerify={handleRecaptcha} />
+      {/* Action name must match the backend contract (RECAPTCHA_ACTION = "submit_job", EMP-003). */}
+      <RecaptchaWidget action="submit_job" refreshKey={recaptchaRefresh} onVerify={handleRecaptcha} />
       <form onSubmit={handleSubmit} className="space-y-6">
         <div className="grid gap-6 lg:grid-cols-2">
           <div className="card-surface space-y-4 p-5">

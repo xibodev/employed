@@ -48,6 +48,9 @@ class Settings(BaseSettings):
     # reCAPTCHA (server-side verification + frontend site key passthrough)
     recaptcha_secret_key: str | None = Field(default=None, alias="RECAPTCHA_SECRET_KEY")
     next_public_recaptcha_site_key: str | None = Field(default=None, alias="NEXT_PUBLIC_RECAPTCHA_SITE_KEY")
+    recaptcha_min_score: float = Field(default=0.5, alias="RECAPTCHA_MIN_SCORE")
+    # Honored only in development/testing environments (see jobs._verify_recaptcha)
+    recaptcha_bypass_in_development: bool = Field(default=False, alias="RECAPTCHA_BYPASS_IN_DEVELOPMENT")
 
     # Google OAuth
     google_client_id: str | None = Field(default=None, alias="GOOGLE_CLIENT_ID")
