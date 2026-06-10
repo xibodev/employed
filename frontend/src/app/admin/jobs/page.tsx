@@ -52,7 +52,7 @@ function AdminJobsContent() {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [adminUsers, setAdminUsers] = useState<AdminUser[]>([]);
   const [reports, setReports] = useState<ReportItem[]>([]);
-  const [error, setError] = useState<string | null>(null);
+  const [panelErrors, setPanelErrors] = useState<{ jobs?: string; users?: string; reports?: string }>({});
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -66,25 +66,36 @@ function AdminJobsContent() {
   }, [isAdmin, isLoading, router, user]);
 
   const loadAdminState = useCallback(async () => {
-    setError(null);
-    try {
-      const [jobsPayload, usersPayload, reportsPayload] = await Promise.all([
-        apiFetch<{ items: AdminJob[]; total: number; page: number; page_size: number }>("/admin/jobs", {
-          query: { status },
-          cache: "no-store",
-        }),
-        apiFetch<AdminUser[]>("/admin/users", { cache: "no-store" }),
-        apiFetch<ReportItem[]>("/admin/reports", { cache: "no-store" }),
-      ]);
+    // EMP-026b: each panel loads independently so one failed request (e.g. a
+    // 500 from /admin/reports) cannot blank the whole moderation dashboard.
+    const [jobsResult, usersResult, reportsResult] = await Promise.allSettled([
+      apiFetch<{ items: AdminJob[]; total: number; page: number; page_size: number }>("/admin/jobs", {
+        query: { status },
+        cache: "no-store",
+      }),
+      apiFetch<AdminUser[]>("/admin/users", { cache: "no-store" }),
+      apiFetch<ReportItem[]>("/admin/reports", { cache: "no-store" }),
+    ]);
 
-      setJobs(jobsPayload.items ?? []);
-      setCounts({ [status]: jobsPayload.total ?? 0 });
-      setAdminUsers(usersPayload ?? []);
-      setReports(reportsPayload ?? []);
-      setSelectedIds([]);
-    } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : "Unable to load moderation dashboard.");
+    const reasonMessage = (reason: unknown, fallback: string) =>
+      reason instanceof Error ? reason.message : fallback;
+
+    if (jobsResult.status === "fulfilled") {
+      setJobs(jobsResult.value.items ?? []);
+      setCounts({ [status]: jobsResult.value.total ?? 0 });
+    } else {
+      setJobs([]);
+      setCounts({});
     }
+    setAdminUsers(usersResult.status === "fulfilled" ? (usersResult.value ?? []) : []);
+    setReports(reportsResult.status === "fulfilled" ? (reportsResult.value ?? []) : []);
+    setSelectedIds([]);
+    setPanelErrors({
+      jobs: jobsResult.status === "rejected" ? reasonMessage(jobsResult.reason, "Unable to load jobs.") : undefined,
+      users: usersResult.status === "rejected" ? reasonMessage(usersResult.reason, "Unable to load users.") : undefined,
+      reports:
+        reportsResult.status === "rejected" ? reasonMessage(reportsResult.reason, "Unable to load reports.") : undefined,
+    });
   }, [status]);
 
   useEffect(() => {
@@ -169,7 +180,9 @@ function AdminJobsContent() {
           </div>
 
           <StatusTabs value={status} counts={derivedCounts} onChange={setStatus} />
-          {error ? <p className="rounded-2xl bg-red-500/10 px-4 py-3 text-sm text-red-300">{error}</p> : null}
+          {panelErrors.jobs ? (
+            <p className="rounded-2xl bg-red-500/10 px-4 py-3 text-sm text-red-300">{panelErrors.jobs}</p>
+          ) : null}
           <AdminJobTable
             jobs={jobs}
             selectedIds={selectedIds}
@@ -182,7 +195,13 @@ function AdminJobsContent() {
         </section>
 
         <aside className="space-y-6">
+          {panelErrors.users ? (
+            <p className="rounded-2xl bg-red-500/10 px-4 py-3 text-sm text-red-300">{panelErrors.users}</p>
+          ) : null}
           <AdminUsersList users={adminUsers} onGrant={handleGrantAdmin} onRevoke={handleRevokeAdmin} />
+          {panelErrors.reports ? (
+            <p className="rounded-2xl bg-red-500/10 px-4 py-3 text-sm text-red-300">{panelErrors.reports}</p>
+          ) : null}
           <ReportsPanel reports={reports} onResolve={handleResolveReport} onDismiss={handleDismissReport} />
         </aside>
       </div>
