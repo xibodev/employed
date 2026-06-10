@@ -315,7 +315,14 @@ async def logout(request: Request) -> MessageResponse:
 
 @router.post("/verify-email/{token}", response_model=TokenStatusResponse)
 def verify_email(token: str, db: Any = Depends(get_db)):
-    payload = decode_verification_token(token)
+    try:
+        payload = decode_verification_token(token)
+    except ValueError as exc:
+        # EMP-025: malformed/expired tokens must return 400, not bubble up
+        # as an unhandled 500.
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or expired verification token"
+        ) from exc
     user = next((item for item in query_all(db, _user_model()) if str(get_user_id(item)) == payload.sub), None)
     if user is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")

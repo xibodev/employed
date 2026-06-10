@@ -99,10 +99,12 @@ def test_forgot_password_and_reset_password_flow(client, test_user):
     assert login.status_code == 200
 
 
-def test_verify_email_with_invalid_token_returns_server_error(client):
+def test_verify_email_with_invalid_token_returns_400(client):
+    # Previously pinned the buggy 500 (unhandled jose error); EMP-025 maps
+    # malformed tokens to a clean 400.
     response = client.post("/auth/verify-email/not-a-real-token")
 
-    assert response.status_code == 500
+    assert response.status_code == 400
 
 
 def test_oauth_callback_creates_or_updates_user(client, monkeypatch):
@@ -226,3 +228,30 @@ def test_email_link_base_falls_back_to_app_base_url(client, monkeypatch):
 
     assert response.status_code == 201
     assert captured["url"].startswith("https://app.employed.example/verify-email/")
+
+
+def test_verify_email_with_garbage_token_returns_400(client):
+    """EMP-025 regression: malformed tokens raised an unhandled jose
+    ValueError -> 500. Must be a clean 400."""
+    response = client.post("/auth/verify-email/not-a-jwt")
+
+    assert response.status_code == 400
+    assert "invalid or expired" in response.json()["detail"].lower()
+
+
+def test_verify_email_with_truncated_token_returns_400(client):
+    """A quoted-printable soft line break truncates the JWT mid-signature
+    (the exact failure seen in the sealed-stack logs)."""
+    token = create_verification_token("some-user-id", "x@example.com")
+    response = client.post(f"/auth/verify-email/{token[:60]}")
+
+    assert response.status_code == 400
+
+
+def test_reset_password_with_garbage_token_returns_400(client):
+    response = client.post(
+        "/auth/reset-password/not-a-jwt",
+        json={"password": "newpassword123"},
+    )
+
+    assert response.status_code == 400

@@ -130,9 +130,15 @@ def decode_token(
 ) -> TokenPayload:
     try:
         payload = jwt.decode(token, _secret_key(), algorithms=[_algorithm()])
-    except JWTError as exc:
+    except (JWTError, ValueError) as exc:
+        # EMP-025: jose can raise raw ValueError (not JWTError) on malformed
+        # input such as a truncated/garbage token; normalize everything to
+        # ValueError("Invalid token") so callers map it to HTTP 400.
         raise ValueError("Invalid token") from exc
-    data = TokenPayload(**payload)
+    try:
+        data = TokenPayload(**payload)
+    except ValueError as exc:  # pydantic ValidationError subclasses ValueError
+        raise ValueError("Invalid token") from exc
     if expected_type and data.type != expected_type:
         raise ValueError("Unexpected token type")
     changed_at_ts = _password_changed_timestamp(password_changed_at)
