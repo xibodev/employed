@@ -95,3 +95,34 @@ def test_admin_can_resolve_report(client, test_admin, test_user, auth_headers, r
     body = response.json()
     assert body["resolution"] == "reviewed"
     assert body["resolved_by"] == test_admin.id
+
+
+def test_report_serializer_wraps_uuid_fields_as_strings():
+    """EMP-026a regression: the Postgres JobReport model maps id/job_id/
+    reporter_user_id/resolved_by as uuid.UUID; ReportRead declares str.
+    Serialization must coerce, or GET /admin/reports 500s."""
+    from types import SimpleNamespace
+    from uuid import uuid4
+
+    from app.routers.reports import report_to_read
+
+    report_id, job_id, reporter_id, resolver_id = uuid4(), uuid4(), uuid4(), uuid4()
+    item = SimpleNamespace(
+        id=report_id,
+        job_id=job_id,
+        reason="spam",
+        details="Looks suspicious",
+        reporter_user_id=reporter_id,
+        resolution="pending",
+        resolved_by=resolver_id,
+        resolved_at=None,
+        created_at=None,
+    )
+
+    read = report_to_read(item)
+
+    assert read.id == str(report_id)
+    assert read.job_id == str(job_id)
+    assert read.reporter_user_id == str(reporter_id)
+    assert read.resolved_by == str(resolver_id)
+    assert read.reason == "spam"

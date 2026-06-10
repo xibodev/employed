@@ -235,18 +235,7 @@ def admin_reports(
     report_model = resolve_model("JobReport", "Report", "JobReports")
     if resolution and resolution not in VALID_RESOLUTIONS:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid report resolution")
+    from app.routers.reports import report_to_read
+
     items = _pushdown_admin_reports(db, report_model, resolution)
-    return [
-        ReportRead(
-            id=str(get_attr(item, "id", "_id", default="")),
-            job_id=get_attr(item, "job_id", "jobId", default=""),
-            reason=get_attr(item, "reason", default=""),
-            details=get_attr(item, "details"),
-            reporter_user_id=get_attr(item, "reporter_user_id", "reporterUserId"),
-            resolution=get_attr(item, "resolution"),
-            resolved_by=get_attr(item, "resolved_by", "resolvedBy"),
-            resolved_at=get_attr(item, "resolved_at", "resolvedAt"),
-            created_at=get_attr(item, "created_at", "createdAt"),
-        )
-        for item in items[:200]
-    ]
+    return [report_to_read(item) for item in items[:200]]

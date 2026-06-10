@@ -23,10 +23,15 @@ def _job_model():
     return resolve_model("Job", "Jobs")
 
 
-def _to_read(report: Any) -> ReportRead:
+def report_to_read(report: Any) -> ReportRead:
+    """Serialize a JobReport row to ReportRead.
+
+    All id-like fields are wrapped in str() because the Postgres model maps
+    them as uuid.UUID, while ReportRead declares plain str (EMP-026a).
+    """
     return ReportRead(
         id=str(get_attr(report, "id", "_id", default="")),
-        job_id=get_attr(report, "job_id", "jobId", default=""),
+        job_id=str(get_attr(report, "job_id", "jobId", default="")),
         reason=get_attr(report, "reason", default=""),
         details=get_attr(report, "details"),
         reporter_user_id=(
@@ -60,7 +65,7 @@ def create_report(
     set_attr(report, get_user_id(current_user) if current_user else None, "reporter_user_id", "reporterUserId")
     set_attr(report, "pending", "resolution")
     set_attr(report, utcnow(), "created_at", "createdAt")
-    return _to_read(save(db, report))
+    return report_to_read(save(db, report))
 
 
 @router.patch("/{report_id}/resolve", response_model=ReportRead)
@@ -78,4 +83,4 @@ def resolve_report(
     set_attr(report, payload.resolution, "resolution")
     set_attr(report, get_user_id(admin_user), "resolved_by", "resolvedBy")
     set_attr(report, utcnow(), "resolved_at", "resolvedAt")
-    return _to_read(save(db, report))
+    return report_to_read(save(db, report))
