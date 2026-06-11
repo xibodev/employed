@@ -33,7 +33,7 @@ tracks the work to remove them.
 |---|---|---|---|---|
 | BL-003 | **EMP-011:** provision Sentry projects `employed-api` + `employed-frontend` (org `nmtss`); set `SENTRY_DSN` + `SENTRY_ENVIRONMENT` in the deploy env; decide on `@sentry/nextjs` for the frontend; redeploy Box 3. Required before any prod traffic (release-decision pre-prod checklist). | `blocked` (external-ops) | operator | EMP-011; SERVICES.md observability table |
 | BL-004 | **EMP-014:** verify the Stripe dashboard webhook endpoint URL ends with `/webhooks/_stripe/webhook` (the previously documented `/_stripe/webhook` 404s). In-repo smoke test already pins the route (`dee9a00`). | `blocked` (external-ops) | operator | EMP-014; execution report |
-| BL-005 | **EMP-028 product decision:** should the poster's contact email remain visible to anonymous visitors on the public job detail page? It is how candidates apply today, but the public API already omits it (inconsistent policy). No safe unilateral default — needs the product owner's call, then a small fix either way. | `blocked` (product decision) | product/operator | EMP-028 (skipped by design); KL-06 |
+| BL-005 | **EMP-028 product decision:** poster contact-email exposure. **Decided + implemented 2026-06-11** (operator authorized acting on the open decision): contact is auth-gated everywhere — anonymous payloads return `null`, signed-in users get an explicit reveal, anonymous visitors get a sign-in CTA; URL/WhatsApp apply paths stay public. Policy + reversal path documented in KL-06. | `tested_locally` | engineering | EMP-028 regression tests in `tests/test_jobs.py`; KL-06 policy entry |
 | BL-006 | **CARTO-001:** extend the EMP-010 SQL pushdown to the public aliases the frontend actually calls (`/api/jobs`, `/api/featuredJobs`). **Resolved on branch 2026-06-11** — both aliases now reuse the shared `_job_query_pushdown` helpers (SQL predicates/COUNT/ORDER BY/LIMIT-OFFSET); parity + SQL-shape regression tests added in `tests/test_public_api.py`; `/api/featuredJobs` keeps its deterministic newest-first contract. | `tested_locally` | engineering | `architecture/repo-map.json` CARTO-001; `backend/app/routers/public_api.py` + `tests/test_public_api.py` this commit |
 | BL-007 | **EMP-019 follow-up:** before M-Pesa/e-Mola go live, confirm with the providers that callbacks carry a `timestamp` field — the fix branch **rejects timestamp-less callbacks with 400** (deliberate contract change; providers are simulator/mock today). | `planned` | operator | execution report EMP-019 notes |
 
@@ -61,5 +61,6 @@ tracks the work to remove them.
 - Nothing in this backlog is `in_progress` — the fix branch's work is complete
   and sits at `tested_locally` in the registry; no stale `in_progress` (>30 days)
   entries exist (first registry pass).
-- Items BL-003/004/005/008/017 are `blocked` with named blockers and owners;
-  everything else is `planned`.
+- Items BL-003/004/008/017 are `blocked` with named blockers and owners;
+  BL-001/005/006 moved to `tested_locally` on 2026-06-11 (fix-executor
+  follow-up pass); everything else is `planned`.

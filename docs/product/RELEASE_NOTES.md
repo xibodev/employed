@@ -69,6 +69,11 @@ re-seeded sealed Docker stack (`fix-execution/execution-report.json`).
 - Mobile-money webhook replay cache moved to Redis; payload `timestamp` now
   **mandatory** — timestamp-less callbacks 400 (`64b721c`, EMP-019).
   **Contract change**: confirm provider payloads before live integration.
+- Poster contact email is now **auth-gated** (EMP-028, decided + implemented
+  2026-06-11): anonymous payloads of `/jobs`, `/jobs/featured` and `/jobs/{id}`
+  return `contact: null` (nothing in SSR HTML source); signed-in users reveal
+  it explicitly on the job detail page, anonymous visitors get a sign-in CTA,
+  and URL/WhatsApp apply paths stay public. Policy + reversal path: KL-06.
 
 ### Fixed — correctness & UX
 
@@ -119,8 +124,6 @@ re-seeded sealed Docker stack (`fix-execution/execution-report.json`).
   in-repo env schema documented (`c238655`).
 - **EMP-014** Stripe-dashboard webhook-URL verification — blocked, external-ops
   (operator); in-repo smoke test pins the route (`dee9a00`).
-- **EMP-028** anonymous visibility of poster contact email — open product
-  decision (BL-005); deliberately unchanged.
 - **TD-004** frontend component-test foundation — tooling decision (BL-008).
 
 ### Deploy-sensitive changes (operator briefing)

@@ -38,7 +38,9 @@ export interface Job {
   country: string;
   location?: string | null;
   url?: string | null;
-  contact: string;
+  // EMP-028: auth-gated — null in anonymous payloads; revealed via an
+  // authenticated re-fetch of the job detail.
+  contact?: string | null;
   apply_whatsapp?: string | null;
   jobtype: JobType;
   remote: boolean;

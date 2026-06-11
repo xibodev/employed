@@ -84,14 +84,35 @@ def test_pagination_returns_requested_page_size(client, job_factory, sample_mark
     assert len(response.json()["items"]) == 12
 
 
-def test_get_job_by_id_returns_full_detail(client, sample_job, sample_market_headers):
+def test_get_job_by_id_returns_full_detail(client, sample_job, test_user, auth_headers, sample_market_headers):
+    """EMP-028: contact email is auth-gated — anonymous detail omits it,
+    any authenticated account gets it (the explicit frontend reveal)."""
     job = sample_job()
 
-    response = client.get(f"/jobs/{job.id}", headers=sample_market_headers("mz"))
+    anonymous = client.get(f"/jobs/{job.id}", headers=sample_market_headers("mz"))
+    authenticated = client.get(f"/jobs/{job.id}", headers=auth_headers(test_user) | sample_market_headers("mz"))
 
-    assert response.status_code == 200
-    assert response.json()["id"] == job.id
-    assert response.json()["contact"] == "jobs@example.com"
+    assert anonymous.status_code == 200
+    assert anonymous.json()["id"] == job.id
+    assert anonymous.json()["contact"] is None
+    assert authenticated.status_code == 200
+    assert authenticated.json()["contact"] == "jobs@example.com"
+
+
+def test_anonymous_list_and_featured_omit_contact(client, job_factory, test_user, auth_headers, sample_market_headers):
+    """EMP-028: the auth gate covers every anonymous-reachable job payload —
+    /jobs and /jobs/featured, not just the detail endpoint."""
+    job_factory(title="Gated Contact Role", featured=True)
+
+    anon_list = client.get("/jobs", headers=sample_market_headers("mz"))
+    anon_featured = client.get("/jobs/featured", headers=sample_market_headers("mz"))
+    auth_list = client.get("/jobs", headers=auth_headers(test_user) | sample_market_headers("mz"))
+    auth_featured = client.get("/jobs/featured", headers=auth_headers(test_user) | sample_market_headers("mz"))
+
+    assert all(item["contact"] is None for item in anon_list.json()["items"])
+    assert all(item["contact"] is None for item in anon_featured.json())
+    assert [item["contact"] for item in auth_list.json()["items"]] == ["jobs@example.com"]
+    assert [item["contact"] for item in auth_featured.json()] == ["jobs@example.com"]
 
 
 def test_get_non_existent_job_returns_404(client, sample_market_headers):

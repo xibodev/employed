@@ -347,7 +347,10 @@ def list_jobs(
     remote: bool | None = None,
     db: Any = Depends(get_db),
     market: dict = Depends(get_current_market),
+    current_user: Any | None = Depends(get_optional_current_user),
 ):
+    # EMP-028 policy: poster contact email is auth-gated everywhere.
+    include_contact = current_user is not None
     model = _job_model()
     pushdown = _job_query_pushdown(model, market, query, jobtype, remote)
     if pushdown is not None:
@@ -366,7 +369,7 @@ def list_jobs(
             offset=(page - 1) * page_size,
         )
         return JobListResponse(
-            items=[_job_to_read(item, request) for item in items],
+            items=[_job_to_read(item, request, include_contact=include_contact) for item in items],
             total=total,
             page=page,
             page_size=page_size,
@@ -378,7 +381,7 @@ def list_jobs(
     start = (page - 1) * page_size
     end = start + page_size
     return JobListResponse(
-        items=[_job_to_read(item, request) for item in items[start:end]],
+        items=[_job_to_read(item, request, include_contact=include_contact) for item in items[start:end]],
         total=len(items),
         page=page,
         page_size=page_size,
@@ -390,6 +393,7 @@ def list_featured_jobs(
     request: Request,
     db: Any = Depends(get_db),
     market: dict = Depends(get_current_market),
+    current_user: Any | None = Depends(get_optional_current_user),
 ):
     now = utcnow()
     model = _job_model()
@@ -406,7 +410,8 @@ def list_featured_jobs(
         ]
     sample_size = min(3, len(candidates))
     chosen = random.sample(candidates, sample_size) if sample_size else []
-    return [_job_to_read(item, request) for item in chosen]
+    # EMP-028 policy: poster contact email is auth-gated everywhere.
+    return [_job_to_read(item, request, include_contact=current_user is not None) for item in chosen]
 
 
 @router.get("/count", response_model=JobCountResponse)
@@ -462,7 +467,10 @@ def get_job(
         is_owner = current_user is not None and get_attr(job, "user_id", "userId") == get_user_id(current_user)
         if not (is_owner or (current_user is not None and is_admin_user(current_user))):
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job not found")
-    return _job_to_read(job, request)
+    # EMP-028 policy: the poster's contact email is auth-gated — anonymous
+    # payloads (and therefore the SSR'd HTML source) omit it; the frontend
+    # offers an explicit signed-in reveal instead.
+    return _job_to_read(job, request, include_contact=current_user is not None)
 
 
 @router.post("", response_model=JobRead, status_code=status.HTTP_201_CREATED)

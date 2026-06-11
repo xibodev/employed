@@ -69,12 +69,23 @@ Transactional email sends as `Employed <noreply@xibodev.com>` via Resend SMTP;
 `employed.xibodev.com` is not Resend-verified, and an `employed.co.mz` sender is
 deferred until `.mz` DNS exists (KL-03). **Remove via:** BL-016 (operator).
 
-## KL-06 — Poster contact email is visible to anonymous visitors (open product decision)
+## KL-06 — Poster contact email visibility (policy set 2026-06-11) — resolved on branch, pending deploy
 
-The public job-detail page shows the poster's contact email to anonymous
-visitors, while the public API omits it — an inconsistent exposure policy. This
-is also how candidates apply today, so it was deliberately **not** changed
-unilaterally (EMP-028 skipped as a product decision). **Resolve via:** BL-005.
+**Policy (EMP-028, implemented on `fix/quality-run-2026-06-10`):** the poster's
+contact email is **auth-gated everywhere**. Anonymous payloads (`GET /jobs`,
+`/jobs/featured`, `/jobs/{id}` and the already-gated `/api/*` aliases) return
+`contact: null`, so the SSR HTML source never carries the address (scrape
+protection). Signed-in users get an explicit "show contact details" reveal on
+the job detail page; anonymous visitors get a sign-in CTA in the apply rail,
+keeping the funnel alive. Apply-by-URL and apply-by-WhatsApp remain available
+to everyone, and owners editing a listing get their contact backfilled via an
+authenticated re-fetch. **Reversal path** (if conversion data says the gate
+hurts): pass `include_contact=True` for anonymous callers at the three
+`_job_to_read` call sites in `backend/app/routers/jobs.py` (marked with
+`EMP-028 policy` comments) and drop the reveal affordance in
+`frontend/src/components/jobs/JobDetail.tsx` — or revert the EMP-028 commit.
+The **live UAT build still shows contact anonymously** until the branch
+merges and deploys.
 
 ## KL-07 — Stripe is test-mode only
 

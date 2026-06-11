@@ -10,7 +10,7 @@ import { Select } from "@/components/ui/Select";
 import { RichTextEditor } from "@/components/ui/RichTextEditor";
 import { RecaptchaWidget } from "@/components/ui/RecaptchaWidget";
 import { JOB_TYPES, SALARY_CURRENCIES, SALARY_PERIODS } from "@/lib/constants";
-import { createJob, updateJob } from "@/lib/api";
+import { createJob, getJob, updateJob } from "@/lib/api";
 import type { Job, JobFormValues } from "@/lib/types";
 import { useAuth } from "@/hooks/useAuth";
 import { useMarket } from "@/hooks/useMarket";
@@ -56,6 +56,23 @@ export default function JobForm({ mode, job }: { mode: "create" | "edit"; job?: 
   useEffect(() => {
     setValues((current) => ({ ...current, country: job?.country ?? market.country }));
   }, [job?.country, market.country]);
+
+  // EMP-028: the edit page fetches the job server-side without auth, so the
+  // gated contact arrives as null. Re-fetch with the owner's token and
+  // backfill the field (without clobbering anything already typed).
+  useEffect(() => {
+    if (mode !== "edit" || !job || job.contact || !isAuthenticated) return;
+    let cancelled = false;
+    getJob(job.id)
+      .then((fresh) => {
+        if (cancelled || !fresh.contact) return;
+        setValues((current) => (current.contact ? current : { ...current, contact: fresh.contact ?? "" }));
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [mode, job, isAuthenticated]);
 
   const salaryOptions = useMemo(() => SALARY_CURRENCIES.map((currency) => ({ label: currency, value: currency })), []);
   const periodOptions = useMemo(() => SALARY_PERIODS.map((period) => ({ label: period, value: period })), []);

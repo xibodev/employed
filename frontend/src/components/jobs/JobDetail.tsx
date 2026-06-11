@@ -8,7 +8,7 @@ import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import type { Job, MarketConfig } from "@/lib/types";
-import { deleteJob, updateJob, apiFetch } from "@/lib/api";
+import { deleteJob, getJob, updateJob, apiFetch } from "@/lib/api";
 import { formatDate, formatSalary, toWhatsAppUrl } from "@/lib/utils";
 import { countryLabel } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
@@ -22,10 +22,31 @@ export default function JobDetail({ job, market }: { job: Job; market: MarketCon
   const [reportReason, setReportReason] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // EMP-028: contact is auth-gated server-side, so the SSR payload carries
+  // null for anonymous renders; signed-in users reveal it explicitly.
+  const [contact, setContact] = useState<string | null>(job.contact ?? null);
+  const [revealState, setRevealState] = useState<"idle" | "busy" | "empty">("idle");
 
   const isOwner = Boolean(user?.id && user.id === job.owner_id);
   const salary = formatSalary(job);
-  const applyHref = useMemo(() => toWhatsAppUrl(job.apply_whatsapp) ?? job.url ?? (job.contact ? `mailto:${job.contact}` : null), [job.apply_whatsapp, job.contact, job.url]);
+  const applyHref = useMemo(() => toWhatsAppUrl(job.apply_whatsapp) ?? job.url ?? (contact ? `mailto:${contact}` : null), [job.apply_whatsapp, contact, job.url]);
+
+  async function revealContact() {
+    setRevealState("busy");
+    setMessage(null);
+    try {
+      const fresh = await getJob(job.id);
+      if (fresh.contact) {
+        setContact(fresh.contact);
+        setRevealState("idle");
+      } else {
+        setRevealState("empty");
+      }
+    } catch (error) {
+      setRevealState("idle");
+      setMessage(error instanceof Error ? error.message : t("revealError"));
+    }
+  }
 
   async function handleDeactivate() {
     if (!isOwner) return;
@@ -112,10 +133,40 @@ export default function JobDetail({ job, market }: { job: Job; market: MarketCon
             >
               {job.apply_whatsapp ? t("applyWhatsApp") : job.url ? t("applyButton") : t("contactEmployer")}
             </a>
+          ) : contact === null && revealState !== "empty" ? (
+            user ? (
+              <Button className="w-full" disabled={revealState === "busy"} onClick={revealContact}>
+                {revealState === "busy" ? t("revealingContact") : t("revealContact")}
+              </Button>
+            ) : (
+              <Link
+                href="/sign-in"
+                className="inline-flex w-full items-center justify-center rounded-xl bg-indigo-600 px-4 py-3 text-sm font-medium text-white transition hover:bg-indigo-500"
+              >
+                {t("signInToContact")}
+              </Link>
+            )
           ) : (
             <p className="rounded-xl border border-zinc-800 bg-[#111827] px-4 py-3 text-sm text-zinc-400">{t("noApplication")}</p>
           )}
-          {job.contact ? <p className="text-sm text-zinc-400">{t("contactLine", { contact: job.contact })}</p> : null}
+          {contact ? (
+            <p className="text-sm text-zinc-400">{t("contactLine", { contact })}</p>
+          ) : applyHref && revealState !== "empty" ? (
+            user ? (
+              <button
+                type="button"
+                disabled={revealState === "busy"}
+                onClick={revealContact}
+                className="text-sm font-medium text-indigo-300 underline underline-offset-2 transition hover:text-indigo-200 disabled:opacity-60"
+              >
+                {revealState === "busy" ? t("revealingContact") : t("revealContact")}
+              </button>
+            ) : (
+              <Link href="/sign-in" className="text-sm font-medium text-indigo-300 underline underline-offset-2 transition hover:text-indigo-200">
+                {t("signInToContact")}
+              </Link>
+            )
+          ) : null}
         </div>
 
         <div className="card-surface space-y-3 p-5 text-sm text-zinc-300">

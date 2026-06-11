@@ -88,7 +88,7 @@ run exists.**
 | EMP-023 | SERVICES.md auth/observability refresh | `implemented` | 2026-06-10 (no commit — file lives outside the repo) | operator | `E:/startup projects/employed.co.mz/SERVICES.md` edited; not committable from this repo (see finding BFS-002) |
 | EMP-011 | Sentry/uptime provisioning | `blocked` (external-ops) | 2026-06-10 `c238655` (in-repo env-schema part) | operator | Provisioning + redeploy are operator actions; see BL-003 |
 | EMP-014 | Stripe dashboard webhook-URL verification | `blocked` (external-ops) | 2026-06-10 `dee9a00` (in-repo smoke test) | operator | Dashboard check is an operator action; see BL-004 |
-| EMP-028 | Anonymous visibility of poster contact email | `blocked` (product decision) | 2026-06-10 (skipped by design) | product/operator | No safe unilateral default; decision item BL-005, limitation KL-06 |
+| EMP-028 | Poster contact email auth-gated (anonymous payloads omit it; explicit signed-in reveal + sign-in CTA) | `tested_locally` | 2026-06-11 (this pass) | engineering | Operator authorized acting on the open decision; regression tests in `tests/test_jobs.py`; policy + reversal path in KL-06; closes BL-005 |
 | TD-001 | Locale-aware E2E assertions | `tested_locally` | 2026-06-10 `5868453` | engineering | `playwright test --list` parses 52 tests; i18n helper unit-checked |
 | TD-002 | QP-decoded MailHog bodies in E2E | `tested_locally` | 2026-06-10 `5868453` | engineering | QP decoder unit-checked (soft-break JWT reassembles) |
 | TD-003 | robots/sitemap E2E expectations → 200 + content | `tested_locally` | 2026-06-10 `5868453` | engineering | confirmed against `next build` output |
