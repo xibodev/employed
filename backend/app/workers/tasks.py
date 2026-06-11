@@ -11,7 +11,13 @@ logger = logging.getLogger(__name__)
 
 
 async def expire_old_jobs(ctx):
-    """Run hourly. Find jobs where created_at < 90 days ago AND status='active'. Set status='expired'."""
+    """Run hourly. Expire active jobs older than 90 days.
+
+    JobStatus has no 'expired' member, so the status maps to 'inactive' —
+    but the transition is now recorded in status_history with reason
+    'expired' so expired listings stay distinguishable from
+    owner-deactivated ones without an enum migration (EMP-017).
+    """
 
     Job = resolve_model("Job", ["job", "jobs"])
     cutoff = utcnow() - timedelta(days=90)
@@ -28,7 +34,20 @@ async def expire_old_jobs(ctx):
         except Exception:
             expired_status = "expired"
         for job in jobs:
+            previous_status = getattr(job, "status", None)
             job.status = expired_status
+            if hasattr(job, "status_history"):
+                history = list(job.status_history or [])
+                history.append(
+                    {
+                        "at": now.isoformat(),
+                        "by": "worker:expire_old_jobs",
+                        "from": str(getattr(previous_status, "value", previous_status)),
+                        "to": str(getattr(expired_status, "value", expired_status)),
+                        "reason": "expired (90-day listing window)",
+                    }
+                )
+                job.status_history = history[-100:]
             if hasattr(job, "expired_at"):
                 job.expired_at = now
             if hasattr(job, "updated_at"):
