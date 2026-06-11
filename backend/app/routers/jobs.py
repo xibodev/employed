@@ -343,8 +343,13 @@ def get_job(
     status_value = get_attr(job, "status")
     if country and country != market["country"] and not (current_user and is_admin_user(current_user)):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job not found")
-    if status_value != "active" and not current_user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job not found")
+    if status_value != "active":
+        # EMP-008: pre-moderation/inactive listings (including poster contact
+        # details) must only be visible to the owner or an admin — not to any
+        # authenticated account.
+        is_owner = current_user is not None and get_attr(job, "user_id", "userId") == get_user_id(current_user)
+        if not (is_owner or (current_user is not None and is_admin_user(current_user))):
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job not found")
     return _job_to_read(job, request)
 
 
@@ -388,7 +393,24 @@ def update_job(
     if job is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job not found")
     _assert_job_owner_or_admin(job, current_user)
+    previous_status = get_attr(job, "status")
     _set_job_fields(job, payload, market, current_user)
+    if previous_status == "active" and not is_admin_user(current_user):
+        # EMP-008: owner edits of an approved listing must go back through
+        # moderation; otherwise content can be swapped post-approval,
+        # bypassing the admin gate.
+        history = list(get_attr(job, "status_history", "statusHistory", default=[]) or [])
+        history.append(
+            {
+                "at": utcnow().isoformat(),
+                "by": str(get_user_id(current_user) or ""),
+                "from": "active",
+                "to": "pending",
+                "reason": "owner edit requires re-moderation",
+            }
+        )
+        set_attr(job, history[-100:], "status_history", "statusHistory")
+        set_attr(job, "pending", "status")
     return _job_to_read(save(db, job), request)
 
 

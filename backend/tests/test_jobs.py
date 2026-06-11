@@ -246,3 +246,73 @@ def test_recaptcha_bypass_only_in_development(monkeypatch):
     monkeypatch.setattr(app_settings, "recaptcha_bypass_in_development", False)
     monkeypatch.setattr(app_settings, "environment", "development")
     assert _recaptcha_bypass_enabled() is False
+
+
+def test_pending_job_hidden_from_non_owner_authenticated_user(
+    client, sample_job, user_factory, auth_headers, sample_market_headers
+):
+    """EMP-008 regression: pre-moderation listings (incl. poster contact)
+    must not be readable by arbitrary authenticated accounts."""
+    owner = user_factory(email="pending-owner@example.com")
+    snooper = user_factory(email="snooper@example.com")
+    job = sample_job(user=owner, status="pending")
+
+    response = client.get(f"/jobs/{job.id}", headers=auth_headers(snooper) | sample_market_headers("mz"))
+
+    assert response.status_code == 404
+
+
+def test_pending_job_visible_to_owner_and_admin(
+    client, sample_job, user_factory, test_admin, auth_headers, sample_market_headers
+):
+    owner = user_factory(email="pending-owner2@example.com")
+    job = sample_job(user=owner, status="pending")
+
+    owner_response = client.get(f"/jobs/{job.id}", headers=auth_headers(owner) | sample_market_headers("mz"))
+    admin_response = client.get(f"/jobs/{job.id}", headers=auth_headers(test_admin) | sample_market_headers("mz"))
+
+    assert owner_response.status_code == 200
+    assert admin_response.status_code == 200
+
+
+def test_pending_job_hidden_from_anonymous(client, sample_job, test_user, sample_market_headers):
+    job = sample_job(user=test_user, status="pending")
+
+    response = client.get(f"/jobs/{job.id}", headers=sample_market_headers("mz"))
+
+    assert response.status_code == 404
+
+
+def test_owner_edit_of_active_job_resets_status_to_pending(
+    client, sample_job, test_user, auth_headers, sample_market_headers, db_session
+):
+    """EMP-008 regression: approved listings cannot be silently mutated;
+    owner edits requeue moderation."""
+    job = sample_job(user=test_user, status="active")
+
+    response = client.put(
+        f"/jobs/{job.id}",
+        json={"title": "Swapped Content"},
+        headers=auth_headers(test_user) | sample_market_headers("mz"),
+    )
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "pending"
+    db_session.refresh(job)
+    assert job.status == "pending"
+    assert job.status_history[-1]["reason"] == "owner edit requires re-moderation"
+
+
+def test_admin_edit_of_active_job_keeps_status(
+    client, sample_job, test_user, test_admin, auth_headers, sample_market_headers
+):
+    job = sample_job(user=test_user, status="active")
+
+    response = client.put(
+        f"/jobs/{job.id}",
+        json={"title": "Admin Touch-up"},
+        headers=auth_headers(test_admin) | sample_market_headers("mz"),
+    )
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "active"
