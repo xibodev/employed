@@ -6,7 +6,15 @@ from app.workers.tasks import settle_simulated_intent
 
 
 def _setting(name: str, default=None):
-    return getattr(settings, name.lower(), getattr(settings, name, default))
+    # Fall through to the default when the Settings field exists but is None
+    # (previously getattr returned the None value and RedisSettings.from_dsn
+    # blew up at import time when REDIS_URL was unset).
+    value = getattr(settings, name.lower(), None)
+    if value in (None, ""):
+        value = getattr(settings, name, None)
+    if value in (None, ""):
+        value = default
+    return value
 
 
 class WorkerSettings:
