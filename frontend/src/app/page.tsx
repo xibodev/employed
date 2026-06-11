@@ -10,7 +10,7 @@ import { getJobs } from "@/lib/api";
 import { resolveMarketFromHeaders } from "@/lib/market";
 import { buildMetadata } from "@/lib/seo";
 import type { Job } from "@/lib/types";
-import { pickRandomItems } from "@/lib/utils";
+import { countryLabel, pickRandomItems } from "@/lib/utils";
 
 async function loadHomeData(host: string, country: string) {
   try {
@@ -46,6 +46,7 @@ export default async function HomePage() {
   const host = requestHeaders.get("x-forwarded-host") ?? requestHeaders.get("host") ?? market.host;
   const { featured, recent } = await loadHomeData(host, market.country);
   const t = await getTranslations("home");
+  const tCountries = await getTranslations("countries");
 
   return (
     <Container className="space-y-10">
@@ -55,7 +56,7 @@ export default async function HomePage() {
             <p className="text-sm font-semibold uppercase tracking-[0.28em] text-indigo-200">{market.siteName}</p>
             <h1 className="max-w-3xl text-4xl font-black tracking-tight text-white sm:text-5xl">{t("heroTagline")}</h1>
             <p className="max-w-2xl text-lg leading-8 text-zinc-200">
-              {t("heroBody", { country: market.country })}
+              {t("heroBody", { country: countryLabel(tCountries, market.country) })}
             </p>
             <div className="flex flex-wrap gap-3">
               <Link href="/jobs" className={buttonStyles({ variant: "primary", size: "lg" })}>

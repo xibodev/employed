@@ -1,7 +1,9 @@
 "use client";
 
+import { useTranslations } from "next-intl";
+
 const PROVIDERS = [
-  { key: "google", label: "Continue with Google", color: "#4285F4" },
+  { key: "google", labelKey: "continueWithGoogle", color: "#4285F4" },
 ] as const;
 
 interface OAuthButtonsProps {
@@ -10,6 +12,7 @@ interface OAuthButtonsProps {
 }
 
 export function OAuthButtons({ onProviderClick, disabled = false }: OAuthButtonsProps) {
+  const t = useTranslations("auth");
   return (
     <div className="space-y-3">
       {PROVIDERS.map((provider) => (
@@ -21,7 +24,7 @@ export function OAuthButtons({ onProviderClick, disabled = false }: OAuthButtons
           className="flex w-full items-center justify-center rounded-xl border border-white/10 px-4 py-3 text-sm font-medium text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
           style={{ backgroundColor: provider.color }}
         >
-          {provider.label}
+          {t(provider.labelKey)}
         </button>
       ))}
     </div>

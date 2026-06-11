@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { MyJobCard } from "@/components/dashboard/MyJobCard";
 import { FeatureJobModal } from "@/components/dashboard/FeatureJobModal";
 import { useAuth } from "@/contexts/AuthContext";
@@ -23,6 +24,7 @@ type DashboardJob = Job & {
 };
 
 function MyJobsContent() {
+  const t = useTranslations("myJobs");
   const router = useRouter();
   const { user, isLoading } = useAuth();
   const [jobs, setJobs] = useState<DashboardJob[]>([]);
@@ -39,11 +41,11 @@ function MyJobsContent() {
       });
       setJobs(Array.isArray(payload) ? payload : payload.items ?? payload.jobs ?? []);
     } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : "Unable to load your jobs.");
+      setError(loadError instanceof Error ? loadError.message : t("loadError"));
     } finally {
       setIsFetching(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -60,7 +62,7 @@ function MyJobsContent() {
   const activeJobs = useMemo(() => jobs.filter((job) => (job.status ?? "").toLowerCase() === "active"), [jobs]);
 
   const handleDelete = async (job: DashboardJob) => {
-    if (!window.confirm(`Delete “${job.title ?? "this job"}”?`)) {
+    if (!window.confirm(t("deleteConfirm", { title: job.title ?? t("thisJob") }))) {
       return;
     }
 
@@ -69,7 +71,7 @@ function MyJobsContent() {
   };
 
   const handleDeactivate = async (job: DashboardJob) => {
-    const nextStatus = window.prompt("Type the new status: inactive or filled", "inactive");
+    const nextStatus = window.prompt(t("statusPrompt"), "inactive");
     if (!nextStatus || !["inactive", "filled"].includes(nextStatus)) {
       return;
     }
@@ -83,16 +85,16 @@ function MyJobsContent() {
       <div className="mx-auto max-w-6xl space-y-6">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <h1 className="text-3xl font-semibold text-[#e4e4e7]">My jobs</h1>
-            <p className="mt-2 text-sm text-[#a1a1aa]">Manage your listings, promotions, and post status changes.</p>
+            <h1 className="text-3xl font-semibold text-[#e4e4e7]">{t("title")}</h1>
+            <p className="mt-2 text-sm text-[#a1a1aa]">{t("subtitle")}</p>
           </div>
           <div className="rounded-2xl border border-white/10 bg-[#16213e] px-4 py-3 text-sm text-[#a1a1aa]">
-            {activeJobs.length} active job{activeJobs.length === 1 ? "" : "s"}
+            {t("activeCount", { count: activeJobs.length })}
           </div>
         </div>
 
         {error ? <p className="rounded-2xl bg-red-500/10 px-4 py-3 text-sm text-red-300">{error}</p> : null}
-        {isFetching ? <p className="text-sm text-[#a1a1aa]">Loading your jobs...</p> : null}
+        {isFetching ? <p className="text-sm text-[#a1a1aa]">{t("loading")}</p> : null}
 
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {jobs.map((job) => (
@@ -106,13 +108,13 @@ function MyJobsContent() {
           ))}
         </div>
 
-        {!isFetching && jobs.length === 0 ? <p className="text-sm text-[#71717a]">You have not posted any jobs yet.</p> : null}
+        {!isFetching && jobs.length === 0 ? <p className="text-sm text-[#71717a]">{t("empty")}</p> : null}
       </div>
 
       <FeatureJobModal
         isOpen={!!featureJob}
         jobId={featureJob?.id ?? featureJob?._id ?? ""}
-        jobTitle={featureJob?.title ?? "Untitled job"}
+        jobTitle={featureJob?.title ?? t("untitled")}
         marketKey={featureJob?.marketKey}
         onClose={() => setFeatureJob(null)}
         onCompleted={() => void loadJobs()}

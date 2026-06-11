@@ -11,7 +11,7 @@ import { resolveMarketFromHeaders } from "@/lib/market";
 import { buildMetadata } from "@/lib/seo";
 import { PER_PAGE_OPTIONS } from "@/lib/constants";
 import type { Job, JobsQuery } from "@/lib/types";
-import { pickRandomItems } from "@/lib/utils";
+import { countryLabel, pickRandomItems } from "@/lib/utils";
 
 function toPositiveInt(value: string | undefined, fallback: number) {
   const parsed = Number(value);
@@ -62,6 +62,7 @@ export default async function JobsPage({ searchParams }: { searchParams: Promise
   const market = resolveMarketFromHeaders(requestHeaders);
   const host = requestHeaders.get("x-forwarded-host") ?? requestHeaders.get("host") ?? market.host;
   const t = await getTranslations("jobsList");
+  const tCountries = await getTranslations("countries");
 
   const page = toPositiveInt(typeof params.page === "string" ? params.page : undefined, 1);
   const perPage = toPositiveInt(typeof params.per_page === "string" ? params.per_page : undefined, PER_PAGE_OPTIONS[0]);
@@ -83,7 +84,7 @@ export default async function JobsPage({ searchParams }: { searchParams: Promise
     <Container className="space-y-8">
       <section className="space-y-3">
         <p className="text-sm font-semibold uppercase tracking-[0.22em] text-indigo-300">{t("kicker")}</p>
-        <h1 className="text-4xl font-bold tracking-tight text-zinc-100">{t("title", { country: market.country })}</h1>
+        <h1 className="text-4xl font-bold tracking-tight text-zinc-100">{t("title", { country: countryLabel(tCountries, market.country) })}</h1>
         <p className="max-w-3xl text-lg text-zinc-400">{t("subtitle")}</p>
       </section>
 

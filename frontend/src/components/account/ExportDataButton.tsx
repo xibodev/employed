@@ -1,9 +1,11 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 import { apiFetch } from "@/lib/api";
 
 export function ExportDataButton() {
+  const t = useTranslations("account");
   const [isExporting, setIsExporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -21,7 +23,7 @@ export function ExportDataButton() {
       anchor.click();
       URL.revokeObjectURL(href);
     } catch (exportError) {
-      setError(exportError instanceof Error ? exportError.message : "Unable to export your data.");
+      setError(exportError instanceof Error ? exportError.message : t("exportError"));
     } finally {
       setIsExporting(false);
     }
@@ -35,7 +37,7 @@ export function ExportDataButton() {
         disabled={isExporting}
         className="rounded-xl bg-[#4F46E5] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#4338ca] disabled:cursor-not-allowed disabled:opacity-60"
       >
-        {isExporting ? "Preparing export..." : "Export my data"}
+        {isExporting ? t("exporting") : t("exportButton")}
       </button>
       {error ? <p className="text-sm text-red-300">{error}</p> : null}
     </div>

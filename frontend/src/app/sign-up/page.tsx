@@ -3,10 +3,12 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { RegisterForm } from "@/components/auth/RegisterForm";
 import { useAuth } from "@/contexts/AuthContext";
 
 function SignUpContent() {
+  const t = useTranslations("auth");
   const router = useRouter();
   const { user, isLoading } = useAuth();
   const [success, setSuccess] = useState(false);
@@ -22,10 +24,10 @@ function SignUpContent() {
       <div className="mx-auto max-w-lg space-y-4">
         {success ? (
           <div className="rounded-3xl border border-emerald-500/20 bg-emerald-500/10 p-8 text-sm text-emerald-100">
-            <h1 className="text-2xl font-semibold text-white">Check your email</h1>
-            <p className="mt-3">We created your account. Check your email for a verification link before posting jobs.</p>
+            <h1 className="text-2xl font-semibold text-white">{t("checkEmailTitle")}</h1>
+            <p className="mt-3">{t("checkEmailBody")}</p>
             <Link className="mt-5 inline-flex font-medium text-[#F59E0B] hover:text-[#fbbf24]" href="/sign-in">
-              Continue to sign in
+              {t("continueToSignIn")}
             </Link>
           </div>
         ) : (

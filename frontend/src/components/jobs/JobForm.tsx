@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useTranslations } from "next-intl";
 
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -13,6 +14,7 @@ import { createJob, updateJob } from "@/lib/api";
 import type { Job, JobFormValues } from "@/lib/types";
 import { useAuth } from "@/hooks/useAuth";
 import { useMarket } from "@/hooks/useMarket";
+import { countryLabel } from "@/lib/utils";
 
 type FormErrors = Partial<Record<keyof JobFormValues, string>> & { form?: string };
 
@@ -24,6 +26,8 @@ function coerceNumber(value: string): number | undefined {
 
 export default function JobForm({ mode, job }: { mode: "create" | "edit"; job?: Job }) {
   const router = useRouter();
+  const t = useTranslations("jobForm");
+  const tCountries = useTranslations("countries");
   const { market } = useMarket();
   const { isAuthenticated } = useAuth();
   const [values, setValues] = useState<JobFormValues>({
@@ -62,11 +66,11 @@ export default function JobForm({ mode, job }: { mode: "create" | "edit"; job?: 
   function validate() {
     const nextErrors: FormErrors = {};
 
-    if (!values.title.trim()) nextErrors.title = "A job title is required.";
-    if (!values.contact.trim()) nextErrors.contact = "Add a contact email or contact point.";
-    if (!values.description.trim() || values.description === "<p></p>") nextErrors.description = "Describe the opportunity in detail.";
+    if (!values.title.trim()) nextErrors.title = t("validationTitle");
+    if (!values.contact.trim()) nextErrors.contact = t("validationContact");
+    if (!values.description.trim() || values.description === "<p></p>") nextErrors.description = t("validationDescription");
     if (values.salary_min && values.salary_max && values.salary_min > values.salary_max) {
-      nextErrors.salary_max = "Maximum salary should be greater than the minimum.";
+      nextErrors.salary_max = t("validationSalary");
     }
 
     setErrors(nextErrors);
@@ -96,16 +100,16 @@ export default function JobForm({ mode, job }: { mode: "create" | "edit"; job?: 
 
       if (mode === "edit" && job) {
         await updateJob(job.id, payload);
-        setSuccess("Job listing updated successfully.");
+        setSuccess(t("successUpdated"));
         router.refresh();
       } else {
         const created = await createJob(payload);
-        setSuccess("Job listing submitted. It will appear once approved.");
+        setSuccess(t("successCreated"));
         router.push(`/jobs/${created.id}`);
         router.refresh();
       }
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Something went wrong while saving your listing.";
+      const message = error instanceof Error ? error.message : t("genericError");
       setErrors({ form: message });
     } finally {
       setSubmitting(false);
@@ -139,8 +143,8 @@ export default function JobForm({ mode, job }: { mode: "create" | "edit"; job?: 
   if (mode === "edit" && !isAuthenticated) {
     return (
       <div className="card-surface p-6 text-sm text-zinc-300">
-        <p className="text-lg font-semibold text-zinc-100">Authentication required</p>
-        <p className="mt-2">You need to sign in with the listing owner account before editing this job.</p>
+        <p className="text-lg font-semibold text-zinc-100">{t("authRequiredTitle")}</p>
+        <p className="mt-2">{t("authRequiredBody")}</p>
       </div>
     );
   }
@@ -152,36 +156,36 @@ export default function JobForm({ mode, job }: { mode: "create" | "edit"; job?: 
       <form onSubmit={handleSubmit} className="space-y-6">
         <div className="grid gap-6 lg:grid-cols-2">
           <div className="card-surface space-y-4 p-5">
-            <h2 className="text-xl font-semibold text-zinc-100">Role details</h2>
-            <Input label="Job title" name="title" value={values.title} error={errors.title} onChange={(event) => update("title", event.target.value)} />
-            <Input label="Company" name="company" value={values.company} onChange={(event) => update("company", event.target.value)} />
-            <Input label="Location" name="location" value={values.location} onChange={(event) => update("location", event.target.value)} hint="City, region, or province" />
-            <Select label="Job type" name="jobtype" value={values.jobtype} onChange={(event) => update("jobtype", event.target.value as JobFormValues["jobtype"])} options={JOB_TYPES.map((type) => ({ label: type, value: type }))} />
+            <h2 className="text-xl font-semibold text-zinc-100">{t("roleDetails")}</h2>
+            <Input label={t("jobTitle")} name="title" value={values.title} error={errors.title} onChange={(event) => update("title", event.target.value)} />
+            <Input label={t("company")} name="company" value={values.company} onChange={(event) => update("company", event.target.value)} />
+            <Input label={t("location")} name="location" value={values.location} onChange={(event) => update("location", event.target.value)} hint={t("locationHint")} />
+            <Select label={t("jobType")} name="jobtype" value={values.jobtype} onChange={(event) => update("jobtype", event.target.value as JobFormValues["jobtype"])} options={JOB_TYPES.map((type) => ({ label: type, value: type }))} />
             <label className="flex items-center gap-3 rounded-xl border border-zinc-800 bg-[#111827] px-4 py-3 text-sm text-zinc-300">
               <input type="checkbox" checked={values.remote} onChange={(event) => update("remote", event.target.checked)} className="size-4 rounded border-zinc-600 bg-zinc-950 text-indigo-500" />
-              This role can be performed remotely.
+              {t("remoteLabel")}
             </label>
-            <Input label="Country" name="country" value={market.country} disabled readOnly />
+            <Input label={t("country")} name="country" value={countryLabel(tCountries, market.country)} disabled readOnly />
           </div>
 
           <div className="card-surface space-y-4 p-5">
-            <h2 className="text-xl font-semibold text-zinc-100">How candidates apply</h2>
-            <Input label="Contact" name="contact" value={values.contact} error={errors.contact} onChange={(event) => update("contact", event.target.value)} hint="Email address or recruiting contact" />
-            <Input label="Apply URL" name="url" value={values.url} onChange={(event) => update("url", event.target.value)} placeholder="https://company.example/jobs/role" />
-            <Input label="WhatsApp apply number" name="apply_whatsapp" value={values.apply_whatsapp} onChange={(event) => update("apply_whatsapp", event.target.value)} placeholder="+258 84 000 0000" />
+            <h2 className="text-xl font-semibold text-zinc-100">{t("applyDetails")}</h2>
+            <Input label={t("contact")} name="contact" value={values.contact} error={errors.contact} onChange={(event) => update("contact", event.target.value)} hint={t("contactHint")} />
+            <Input label={t("applyUrl")} name="url" value={values.url} onChange={(event) => update("url", event.target.value)} placeholder="https://company.example/jobs/role" />
+            <Input label={t("whatsapp")} name="apply_whatsapp" value={values.apply_whatsapp} onChange={(event) => update("apply_whatsapp", event.target.value)} placeholder="+258 84 000 0000" />
             <div className="grid gap-4 sm:grid-cols-2">
-              <Input label="Salary min" type="number" name="salary_min" value={values.salary_min ?? ""} onChange={(event) => update("salary_min", coerceNumber(event.target.value))} />
-              <Input label="Salary max" type="number" name="salary_max" value={values.salary_max ?? ""} error={errors.salary_max} onChange={(event) => update("salary_max", coerceNumber(event.target.value))} />
+              <Input label={t("salaryMin")} type="number" name="salary_min" value={values.salary_min ?? ""} onChange={(event) => update("salary_min", coerceNumber(event.target.value))} />
+              <Input label={t("salaryMax")} type="number" name="salary_max" value={values.salary_max ?? ""} error={errors.salary_max} onChange={(event) => update("salary_max", coerceNumber(event.target.value))} />
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
-              <Select label="Currency" name="salary_currency" value={values.salary_currency ?? ""} onChange={(event) => update("salary_currency", (event.target.value || undefined) as JobFormValues["salary_currency"])} options={[{ label: "Choose currency", value: "" }, ...salaryOptions]} />
-              <Select label="Period" name="salary_period" value={values.salary_period ?? ""} onChange={(event) => update("salary_period", (event.target.value || undefined) as JobFormValues["salary_period"])} options={[{ label: "Choose period", value: "" }, ...periodOptions]} />
+              <Select label={t("currency")} name="salary_currency" value={values.salary_currency ?? ""} onChange={(event) => update("salary_currency", (event.target.value || undefined) as JobFormValues["salary_currency"])} options={[{ label: t("chooseCurrency"), value: "" }, ...salaryOptions]} />
+              <Select label={t("period")} name="salary_period" value={values.salary_period ?? ""} onChange={(event) => update("salary_period", (event.target.value || undefined) as JobFormValues["salary_period"])} options={[{ label: t("choosePeriod"), value: "" }, ...periodOptions]} />
             </div>
           </div>
         </div>
 
         <div className="card-surface space-y-4 p-5">
-          <RichTextEditor label="Job description" value={values.description} onChange={(value) => update("description", value)} error={errors.description} />
+          <RichTextEditor label={t("description")} value={values.description} onChange={(value) => update("description", value)} error={errors.description} />
         </div>
 
         {errors.form ? (
@@ -195,7 +199,7 @@ export default function JobForm({ mode, job }: { mode: "create" | "edit"; job?: 
                 setSubmitting(false);
               }}
             >
-              Dismiss and try again
+              {t("dismissRetry")}
             </button>
           </div>
         ) : null}
@@ -203,10 +207,10 @@ export default function JobForm({ mode, job }: { mode: "create" | "edit"; job?: 
 
         <div className="flex flex-wrap items-center gap-3">
           <Button type="submit" size="lg" disabled={submitting}>
-            {submitting ? "Saving…" : mode === "edit" ? "Save changes" : "Post job"}
+            {submitting ? t("saving") : mode === "edit" ? t("saveChanges") : t("submit")}
           </Button>
           <p className="text-sm text-zinc-500">
-            {isAuthenticated ? "Signed-in employers can edit later from the job detail view." : "Anonymous submissions require reCAPTCHA verification before posting."}
+            {isAuthenticated ? t("authNote") : t("anonNote")}
           </p>
         </div>
       </form>

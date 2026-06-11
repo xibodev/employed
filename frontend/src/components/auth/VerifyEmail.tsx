@@ -2,13 +2,14 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 import { apiFetch } from "@/lib/api";
 
 type VerifyState = "loading" | "success" | "already-verified" | "error";
 
 export function VerifyEmail({ token }: { token: string }) {
+  const t = useTranslations("auth");
   const [state, setState] = useState<VerifyState>("loading");
-  const [message, setMessage] = useState("Verifying your email address...");
 
   useEffect(() => {
     let active = true;
@@ -25,18 +26,15 @@ export function VerifyEmail({ token }: { token: string }) {
 
         if (payload?.status === "already-verified") {
           setState("already-verified");
-          setMessage(payload.message ?? "Your email is already verified.");
           return;
         }
 
         setState("success");
-        setMessage(payload?.message ?? "Your email has been verified. You can now sign in.");
-      } catch (verifyError) {
+      } catch {
         if (!active) {
           return;
         }
         setState("error");
-        setMessage(verifyError instanceof Error ? verifyError.message : "We could not verify this email link.");
       }
     };
 
@@ -47,18 +45,27 @@ export function VerifyEmail({ token }: { token: string }) {
     };
   }, [token]);
 
+  const message =
+    state === "loading"
+      ? t("verifying")
+      : state === "success"
+        ? t("verifySuccess")
+        : state === "already-verified"
+          ? t("verifyAlready")
+          : t("verifyError");
+
   const tone = state === "error" ? "text-red-300" : state === "success" ? "text-emerald-200" : "text-[#a1a1aa]";
 
   return (
     <div className="rounded-3xl border border-white/10 bg-[#16213e] p-8 shadow-2xl shadow-black/30">
-      <h1 className="text-3xl font-semibold text-[#e4e4e7]">Verify email</h1>
+      <h1 className="text-3xl font-semibold text-[#e4e4e7]">{t("verifyTitle")}</h1>
       <p className={`mt-4 text-sm ${tone}`}>{message}</p>
       <div className="mt-6 flex flex-wrap gap-3">
         <Link className="rounded-xl bg-[#4F46E5] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#4338ca]" href="/sign-in">
-          Go to sign in
+          {t("goToSignIn")}
         </Link>
         <Link className="rounded-xl border border-white/10 px-4 py-3 text-sm font-medium text-[#e4e4e7] transition hover:bg-white/5" href="/">
-          Return home
+          {t("returnHome")}
         </Link>
       </div>
     </div>

@@ -1,15 +1,16 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useTranslations } from "next-intl";
 import { apiFetch } from "@/lib/api";
 import { MARKETS, resolveMarketFromHostname } from "@/lib/market";
 import type { MarketKey } from "@/lib/types";
 import { PaymentPoller } from "./PaymentPoller";
 
-const PROVIDER_META: Record<string, { label: string; description: string }> = {
-  stripe: { label: "Stripe", description: "Redirect to secure card checkout." },
-  mpesa: { label: "M-Pesa", description: "Pay from your Vodacom MZ wallet." },
-  emola: { label: "e-Mola", description: "Pay from your Movitel e-Mola wallet." },
+const PROVIDER_META: Record<string, { label: string; descriptionKey: string }> = {
+  stripe: { label: "Stripe", descriptionKey: "stripeDesc" },
+  mpesa: { label: "M-Pesa", descriptionKey: "mpesaDesc" },
+  emola: { label: "e-Mola", descriptionKey: "emolaDesc" },
 };
 
 
@@ -33,6 +34,20 @@ function sanitizeMsisdn(msisdn: string) {
   return msisdn.replace(/\D+/g, "");
 }
 
+const STATUS_KEYS: Record<string, string> = {
+  pending: "statusPending",
+  awaiting_user: "statusAwaitingUser",
+  completed: "statusCompleted",
+  failed: "statusFailed",
+  cancelled: "statusCancelled",
+  expired: "statusExpired",
+};
+
+function statuslabel(t: (key: string) => string, status: string) {
+  const key = STATUS_KEYS[status];
+  return key ? t(key) : status.replace(/_/g, " ");
+}
+
 function validateMsisdn(provider: string, msisdn: string) {
   if (provider === "mpesa") {
     return /^(84|85)\d{7}$/.test(msisdn);
@@ -44,6 +59,7 @@ function validateMsisdn(provider: string, msisdn: string) {
 }
 
 export function FeatureJobModal({ isOpen, jobId, jobTitle, marketKey, onClose, onCompleted }: FeatureJobModalProps) {
+  const t = useTranslations("featurePayment");
   const inferredMarketKey = useMemo<MarketKey>(() => {
     if (marketKey === "mx" || marketKey === "mz") {
       return marketKey;
@@ -113,13 +129,13 @@ export function FeatureJobModal({ isOpen, jobId, jobTitle, marketKey, onClose, o
 
   const submitFeature = async () => {
     if (!selectedProvider) {
-      setError("Choose a payment provider to continue.");
+      setError(t("chooseProvider"));
       return;
     }
 
     const digits = sanitizeMsisdn(msisdn);
     if (currentProvider?.ui?.collect === "msisdn" && !validateMsisdn(selectedProvider, digits)) {
-      setError(selectedProvider === "mpesa" ? "Use an M-Pesa number starting with 84 or 85." : "Use an e-Mola number starting with 86 or 87.");
+      setError(selectedProvider === "mpesa" ? t("msisdnMpesa") : t("msisdnEmola"));
       return;
     }
 
@@ -154,7 +170,7 @@ export function FeatureJobModal({ isOpen, jobId, jobTitle, marketKey, onClose, o
 
       setPaymentId(nextPaymentId);
     } catch (submitError) {
-      setError(submitError instanceof Error ? submitError.message : "Unable to initiate payment.");
+      setError(submitError instanceof Error ? submitError.message : t("initiateError"));
     } finally {
       setIsLoading(false);
     }
@@ -178,7 +194,7 @@ export function FeatureJobModal({ isOpen, jobId, jobTitle, marketKey, onClose, o
     }
 
     if (status !== "pending" && status !== "awaiting_user") {
-      setError(`Payment ${status.replace(/_/g, " ")}. Please try again.`);
+      setError(t("paymentFailed", { status: statuslabel(t, status) }));
       setPaymentId(null);
     }
   };
@@ -192,17 +208,17 @@ export function FeatureJobModal({ isOpen, jobId, jobTitle, marketKey, onClose, o
       <div className="w-full max-w-2xl rounded-3xl border border-white/10 bg-[#16213e] p-6 shadow-2xl shadow-black/40">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h3 className="text-2xl font-semibold text-[#e4e4e7]">Feature job</h3>
-            <p className="mt-2 text-sm text-[#a1a1aa]">Promote “{jobTitle}” with a featured placement.</p>
+            <h3 className="text-2xl font-semibold text-[#e4e4e7]">{t("title")}</h3>
+            <p className="mt-2 text-sm text-[#a1a1aa]">{t("promote", { title: jobTitle })}</p>
           </div>
           <button type="button" onClick={onClose} className="text-sm text-[#a1a1aa] transition hover:text-white">
-            Close
+            {t("close")}
           </button>
         </div>
 
         <div className="mt-6 grid gap-3 md:grid-cols-3">
           {providers.map((provider) => {
-            const meta = PROVIDER_META[provider.key] ?? { label: provider.name ?? provider.key, description: "Pay securely." };
+            const meta = PROVIDER_META[provider.key] ?? { label: provider.name ?? provider.key, descriptionKey: "paySecurely" };
             const active = selectedProvider === provider.key;
             return (
               <button
@@ -214,8 +230,8 @@ export function FeatureJobModal({ isOpen, jobId, jobTitle, marketKey, onClose, o
                 }`}
               >
                 <p className="text-sm font-semibold text-[#e4e4e7]">{meta.label}</p>
-                <p className="mt-2 text-sm text-[#a1a1aa]">{meta.description}</p>
-                {provider.simulator ? <p className="mt-3 text-xs uppercase tracking-[0.2em] text-[#F59E0B]">Simulator</p> : null}
+                <p className="mt-2 text-sm text-[#a1a1aa]">{t(meta.descriptionKey)}</p>
+                {provider.simulator ? <p className="mt-3 text-xs uppercase tracking-[0.2em] text-[#F59E0B]">{t("simulator")}</p> : null}
               </button>
             );
           })}
@@ -224,7 +240,7 @@ export function FeatureJobModal({ isOpen, jobId, jobTitle, marketKey, onClose, o
         {currentProvider?.ui?.collect === "msisdn" ? (
           <div className="mt-6 space-y-2">
             <label className="text-sm font-medium text-[#e4e4e7]" htmlFor="feature-msisdn">
-              Mobile number
+              {t("mobileNumber")}
             </label>
             <input
               id="feature-msisdn"
@@ -252,14 +268,14 @@ export function FeatureJobModal({ isOpen, jobId, jobTitle, marketKey, onClose, o
               disabled={isLoading || !selectedProvider}
               className="rounded-xl bg-[#4F46E5] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#4338ca] disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {isLoading ? "Starting payment..." : "Continue"}
+              {isLoading ? t("startingPayment") : t("continue")}
             </button>
             <button
               type="button"
               onClick={onClose}
               className="rounded-xl border border-white/10 px-4 py-3 text-sm font-medium text-[#e4e4e7] transition hover:bg-white/5"
             >
-              Cancel
+              {t("cancel")}
             </button>
           </div>
         ) : null}

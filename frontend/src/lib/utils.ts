@@ -62,3 +62,19 @@ export function toWhatsAppUrl(value?: string | null): string | null {
   const digits = value.replace(/\D/g, "");
   return digits ? `https://wa.me/${digits}` : null;
 }
+
+/**
+ * Localized display name for a market country (EMP-027). The canonical API
+ * value ("Mexico"/"Mozambique") is a data contract and must not change;
+ * only the rendered label is localized (e.g. "Moçambique", "México").
+ */
+const COUNTRY_MESSAGE_KEYS: Record<string, string> = {
+  Mexico: "mexico",
+  Mozambique: "mozambique",
+};
+
+export function countryLabel(t: (key: string) => string, country?: string | null): string {
+  if (!country) return "";
+  const key = COUNTRY_MESSAGE_KEYS[country];
+  return key ? t(key) : country;
+}

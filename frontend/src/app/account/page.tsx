@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { AccountSettings } from "@/components/account/AccountSettings";
 import { useAuth } from "@/contexts/AuthContext";
 import { apiFetch } from "@/lib/api";
@@ -14,6 +15,7 @@ type AccountUser = AuthUser & {
 };
 
 function AccountContent() {
+  const t = useTranslations("account");
   const router = useRouter();
   const { user, isLoading, isEmailVerified, refreshToken } = useAuth();
   const [accountUser, setAccountUser] = useState<AccountUser | null>(null);
@@ -33,7 +35,7 @@ function AccountContent() {
 
   const resendVerification = async () => {
     await apiFetch<void>("/auth/resend-verification", { method: "POST", cache: "no-store" });
-    setInfoMessage("Verification email sent. Check your inbox.");
+    setInfoMessage(t("verificationSent"));
   };
 
   const requestDeletion = async () => {
@@ -42,19 +44,19 @@ function AccountContent() {
       cache: "no-store",
     });
     setAccountUser((current) => (current ? { ...current, deletionScheduledFor: payload?.scheduledFor ?? current.deletionScheduledFor } : current));
-    setInfoMessage("Account deletion requested. You can still cancel during the 30-day grace period.");
+    setInfoMessage(t("deletionRequested"));
     await refreshToken();
   };
 
   const cancelDeletion = async () => {
     await apiFetch<void>("/users/me/deletion", { method: "DELETE", cache: "no-store" });
     setAccountUser((current) => (current ? { ...current, deletionScheduledFor: undefined } : current));
-    setInfoMessage("Account deletion request canceled.");
+    setInfoMessage(t("deletionCanceled"));
     await refreshToken();
   };
 
   if (!accountUser) {
-    return <main className="min-h-screen bg-[#1a1a2e] px-4 py-12 text-sm text-[#a1a1aa]">Loading account...</main>;
+    return <main className="min-h-screen bg-[#1a1a2e] px-4 py-12 text-sm text-[#a1a1aa]">{t("loading")}</main>;
   }
 
   return (

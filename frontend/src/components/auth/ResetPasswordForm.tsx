@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { type FormEvent, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { apiFetch } from "@/lib/api";
 
 const inputClassName =
@@ -11,6 +12,7 @@ const inputClassName =
 type ValidationState = "loading" | "valid" | "invalid";
 
 export function ResetPasswordForm({ token }: { token: string }) {
+  const t = useTranslations("auth");
   const router = useRouter();
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -30,7 +32,7 @@ export function ResetPasswordForm({ token }: { token: string }) {
       } catch {
         if (active) {
           setValidationState("invalid");
-          setError("This reset link is invalid or has expired.");
+          setError(t("resetInvalid"));
         }
       }
     };
@@ -39,14 +41,14 @@ export function ResetPasswordForm({ token }: { token: string }) {
     return () => {
       active = false;
     };
-  }, [token]);
+  }, [t, token]);
 
   const passwordMismatch = useMemo(() => confirmPassword.length > 0 && confirmPassword !== password, [confirmPassword, password]);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (passwordMismatch) {
-      setError("Passwords do not match.");
+      setError(t("passwordsMismatch"));
       return;
     }
 
@@ -60,7 +62,7 @@ export function ResetPasswordForm({ token }: { token: string }) {
       });
       router.replace("/sign-in?reset=success");
     } catch (submitError) {
-      const message = submitError instanceof Error ? submitError.message : "Unable to reset password.";
+      const message = submitError instanceof Error ? submitError.message : t("resetError");
       setError(message);
     } finally {
       setIsSubmitting(false);
@@ -68,16 +70,16 @@ export function ResetPasswordForm({ token }: { token: string }) {
   };
 
   if (validationState === "loading") {
-    return <div className="rounded-3xl border border-white/10 bg-[#16213e] p-8 text-sm text-[#a1a1aa]">Validating your reset link...</div>;
+    return <div className="rounded-3xl border border-white/10 bg-[#16213e] p-8 text-sm text-[#a1a1aa]">{t("resetValidating")}</div>;
   }
 
   if (validationState === "invalid") {
     return (
       <div className="rounded-3xl border border-red-500/20 bg-[#16213e] p-8 shadow-2xl shadow-black/30">
-        <h1 className="text-3xl font-semibold text-[#e4e4e7]">Reset link unavailable</h1>
+        <h1 className="text-3xl font-semibold text-[#e4e4e7]">{t("resetUnavailableTitle")}</h1>
         <p className="mt-4 text-sm text-red-300">{error}</p>
         <Link className="mt-6 inline-flex text-sm font-medium text-[#F59E0B] hover:text-[#fbbf24]" href="/forgot-password">
-          Request a new link
+          {t("requestNewLink")}
         </Link>
       </div>
     );
@@ -86,14 +88,14 @@ export function ResetPasswordForm({ token }: { token: string }) {
   return (
     <div className="rounded-3xl border border-white/10 bg-[#16213e] p-8 shadow-2xl shadow-black/30">
       <div className="mb-8 space-y-2">
-        <h1 className="text-3xl font-semibold text-[#e4e4e7]">Set a new password</h1>
-        <p className="text-sm text-[#a1a1aa]">Choose a secure password for your Employed account.</p>
+        <h1 className="text-3xl font-semibold text-[#e4e4e7]">{t("resetTitle")}</h1>
+        <p className="text-sm text-[#a1a1aa]">{t("resetSubtitle")}</p>
       </div>
 
       <form className="space-y-4" onSubmit={handleSubmit}>
         <div className="space-y-2">
           <label className="text-sm font-medium text-[#e4e4e7]" htmlFor="reset-password">
-            New password
+            {t("newPassword")}
           </label>
           <input
             id="reset-password"
@@ -107,7 +109,7 @@ export function ResetPasswordForm({ token }: { token: string }) {
 
         <div className="space-y-2">
           <label className="text-sm font-medium text-[#e4e4e7]" htmlFor="reset-password-confirm">
-            Confirm password
+            {t("confirmPassword")}
           </label>
           <input
             id="reset-password-confirm"
@@ -117,7 +119,7 @@ export function ResetPasswordForm({ token }: { token: string }) {
             value={confirmPassword}
             onChange={(event) => setConfirmPassword(event.target.value)}
           />
-          {passwordMismatch ? <p className="text-xs text-red-300">Passwords do not match.</p> : null}
+          {passwordMismatch ? <p className="text-xs text-red-300">{t("passwordsMismatch")}</p> : null}
         </div>
 
         {error ? <p className="rounded-xl bg-red-500/10 px-4 py-3 text-sm text-red-300">{error}</p> : null}
@@ -127,7 +129,7 @@ export function ResetPasswordForm({ token }: { token: string }) {
           disabled={isSubmitting || password.length < 8 || passwordMismatch}
           className="w-full rounded-xl bg-[#4F46E5] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#4338ca] disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {isSubmitting ? "Saving..." : "Update password"}
+          {isSubmitting ? t("savingPassword") : t("updatePassword")}
         </button>
       </form>
     </div>
