@@ -1,5 +1,48 @@
 import type { MarketConfig, MarketKey } from "@/lib/types";
 
+/**
+ * EMP-013/EMP-024 (AI-OPS Rule 2): the deployment domain is never hardcoded
+ * in source. All market hostnames derive from the single NEXT_PUBLIC_APP_URL
+ * env var (the UAT/production apex). Local dev falls back to lvh.me-style
+ * market subdomains.
+ */
+const DEFAULT_APP_URL = "http://localhost:3000";
+
+export function appBaseUrl(): string {
+  const raw = process.env.NEXT_PUBLIC_APP_URL ?? DEFAULT_APP_URL;
+  return raw.replace(/\/+$/, "");
+}
+
+function parseAppUrl(): { scheme: string; host: string } {
+  try {
+    const url = new URL(appBaseUrl());
+    return { scheme: url.protocol.replace(":", ""), host: url.host };
+  } catch {
+    const stripped = appBaseUrl().replace(/^https?:\/\//, "").split("/")[0];
+    return { scheme: "https", host: stripped || "localhost:3000" };
+  }
+}
+
+/** Base host with any leading market label removed (mx.foo.tld -> foo.tld). */
+function baseDomain(): string {
+  const { host } = parseAppUrl();
+  return host.replace(/^(mx|mz)\./, "");
+}
+
+function marketHost(key: MarketKey): string {
+  const domain = baseDomain();
+  if (domain.startsWith("localhost") || domain.includes("lvh.me")) {
+    return `${key}.lvh.me`;
+  }
+  return `${key}.${domain}`;
+}
+
+/** Absolute base URL for a market (scheme from NEXT_PUBLIC_APP_URL). */
+export function marketBaseUrl(key: MarketKey): string {
+  const { scheme } = parseAppUrl();
+  return `${scheme}://${marketHost(key)}`;
+}
+
 export const MARKETS = {
   mx: {
     key: "mx",
@@ -7,7 +50,7 @@ export const MARKETS = {
     locale: "es",
     siteName: "Employed MX",
     tagline: "Local jobs. Local hiring.",
-    host: "mx.employed.co.mz",
+    host: marketHost("mx"),
     featuredJob: { amount: 99900, currency: "mxn", label: "MX$999" },
     paymentProviders: ["stripe"]
   },
@@ -17,7 +60,7 @@ export const MARKETS = {
     locale: "pt",
     siteName: "Employed MZ",
     tagline: "Local jobs. Local hiring.",
-    host: "mz.employed.co.mz",
+    host: marketHost("mz"),
     featuredJob: { amount: 250000, currency: "mzn", label: "MZN 2,500" },
     paymentProviders: ["mpesa", "emola", "stripe"]
   }
@@ -54,5 +97,6 @@ export function buildMarketHostname(target: MarketKey, currentHostname: string):
     return parts.join(".");
   }
 
+  // Non-market host (e.g. the apex): derive from the env-configured domain.
   return MARKETS[target].host;
 }

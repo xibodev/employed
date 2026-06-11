@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
 
+import { marketBaseUrl } from "@/lib/market";
 import type { Job, MarketConfig } from "@/lib/types";
 import { stripHtml, truncateHtml } from "@/lib/utils";
 
 export function marketUrl(market: MarketConfig, pathname = "/"): string {
   const normalisedPath = pathname.startsWith("/") ? pathname : `/${pathname}`;
-  return `https://${market.host}${normalisedPath}`;
+  return `${marketBaseUrl(market.key)}${normalisedPath}`;
 }
 
 export function pageTitle(title: string, market: MarketConfig): string {
@@ -26,7 +27,7 @@ export function buildMetadata({
   const url = marketUrl(market, pathname);
 
   return {
-    metadataBase: new URL(`https://${market.host}`),
+    metadataBase: new URL(marketBaseUrl(market.key)),
     title: pageTitle(title, market),
     description,
     alternates: {
