@@ -62,7 +62,7 @@ run exists.**
 | ID | Title | Status | Last activity (commit) | Owner | Evidence |
 |---|---|---|---|---|---|
 | EMP-026a | Fix `GET /admin/reports` 500 (UUID → str serialization) | `tested_locally` | 2026-06-10 `548c6b6` | engineering | pytest test_admin 10 passed + regression test + empirical 200 with seeded reports |
-| EMP-026b | Admin dashboard degrades per-panel instead of blanking | `tested_locally` | 2026-06-10 `592a0d4` | engineering | tsc/eslint/build; **empirical gap:** stub-500 Playwright not run (finding BFS-003) |
+| EMP-026b | Admin dashboard degrades per-panel instead of blanking | `tested_locally` | 2026-06-11 (BFS-003 regression spec added) | engineering | tsc/eslint/build + behavioral Playwright regression `tests/e2e/regression-admin-panel-degradation.spec.js` (stub-500 reports, jobs/users still render); spec parses via `--list`, execution needs the live stack (post-merge suite re-run) |
 | EMP-001 | MarketMiddleware honors `X-Forwarded-Host` | `tested_locally` | 2026-06-10 `e655f74` | engineering | 4 regression tests + empirical x-market/countries/providers checks |
 | EMP-004 | Email links target frontend pages (`FRONTEND_BASE_URL`) | `tested_locally` | 2026-06-10 `2a01442` | engineering | 3 regression tests + MailHog-captured frontend link |
 | EMP-002+003 | reCAPTCHA secret resolvable + `submit_job` action contract | `tested_locally` | 2026-06-10 `0aa4c54` | engineering | env/settings + action-contract tests + in-container probe |

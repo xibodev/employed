@@ -117,6 +117,10 @@ re-seeded sealed Docker stack (`fix-execution/execution-report.json`).
   duplicates/drops (`be945ac`, EMP-009). No migration shipped.
 - E2E suite made trustworthy: locale-aware assertions, QP-decoded MailHog
   bodies, robots/sitemap 200 expectations (`5868453`, TD-001/002/003).
+- BFS-003 closed: behavioral Playwright regression for EMP-026b per-panel
+  admin degradation (`tests/e2e/regression-admin-panel-degradation.spec.js` —
+  stubs `/admin/reports` → 500, asserts jobs/users panels render and only the
+  reports panel errors). Requires the running stack, like the journey specs.
 
 ### NOT in this release (blocked / deferred)
 

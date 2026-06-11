@@ -102,9 +102,13 @@ stay canonical API values. Locales are en/pt/es. **Remove via:** BL-015.
 ## KL-09 — No frontend component tests
 
 The frontend ships with zero unit/component tests; the gate relies on
-eslint/tsc/build plus E2E. EMP-026b's per-panel degradation is validated by
-types/build only — the stub-500 Playwright check has not run (finding BFS-003).
-**Remove via:** BL-008.
+eslint/tsc/build plus E2E. EMP-026b's per-panel degradation now has a
+behavioral Playwright regression
+(`tests/e2e/regression-admin-panel-degradation.spec.js`, added 2026-06-11 for
+finding BFS-003: stubs `/admin/reports` → 500, asserts jobs/users panels still
+render and only the reports panel shows an error). Like the rest of the E2E
+suite it needs the running local stack — include it in the post-merge suite
+re-run. Component-test infra itself is still absent. **Remove via:** BL-008.
 
 ## KL-10 — Public listing aliases are unoptimized (CARTO-001) — resolved on branch, pending deploy
 
