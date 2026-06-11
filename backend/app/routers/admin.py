@@ -164,24 +164,59 @@ def bulk_set_status(
     return BulkStatusResult(requested=len(payload.job_ids), updated=updated)
 
 
-@router.get("/users", response_model=list[UserRead])
-def admin_users(db: Any = Depends(get_db), admin_user: Any = Depends(require_admin)):
-    user_model = resolve_model("User")
-    users = []
+def _admin_user_to_read(user: Any) -> UserRead:
+    return UserRead(
+        id=str(get_user_id(user) or ""),
+        email=get_primary_email(user),
+        name=get_attr(user, "display_name", "name", "full_name", "username"),
+        roles=get_user_roles(user),
+        email_verified=is_email_verified(user),
+        created_at=get_attr(user, "created_at", "createdAt"),
+        deletion_requested_at=get_attr(user, "deletion_requested_at", "deletionRequestedAt"),
+        deletion_scheduled_for=get_attr(user, "deletion_scheduled_for", "deletionScheduledFor"),
+    )
+
+
+def _search_users(db: Any, user_model: Any, q: str, limit: int = 50) -> list[Any]:
+    """Indexed-ish email/name search so admins can find users to promote
+    (EMP-015). Pushes ILIKE-style predicates to the DB where the model
+    exposes columns; falls back to a Python scan for plain test rigs."""
+    needle = q.strip().lower()
+    email_field = get_model_field(user_model, "email")
+    name_field = get_model_field(user_model, "display_name", "name", "username")
+    if email_field is not None:
+        from sqlalchemy import func, or_
+
+        pattern = f"%{needle}%"
+        predicate = func.lower(email_field).like(pattern)
+        if name_field is not None:
+            predicate = or_(predicate, func.lower(name_field).like(pattern))
+        return query_all(db, user_model, filters=[predicate], limit=limit)
+    matches = []
     for user in query_all(db, user_model):
-        if "admin" in get_user_roles(user):
-            users.append(
-                UserRead(
-                    id=str(get_user_id(user) or ""),
-                    email=get_primary_email(user),
-                    name=get_attr(user, "display_name", "name", "full_name", "username"),
-                    roles=get_user_roles(user),
-                    email_verified=is_email_verified(user),
-                    created_at=get_attr(user, "created_at", "createdAt"),
-                    deletion_requested_at=get_attr(user, "deletion_requested_at", "deletionRequestedAt"),
-                    deletion_scheduled_for=get_attr(user, "deletion_scheduled_for", "deletionScheduledFor"),
-                )
-            )
+        email = (get_primary_email(user) or "").lower()
+        name = str(get_attr(user, "display_name", "name", "username", default="") or "").lower()
+        if needle in email or needle in name:
+            matches.append(user)
+            if len(matches) >= limit:
+                break
+    return matches
+
+
+@router.get("/users", response_model=list[UserRead])
+def admin_users(
+    q: str | None = Query(default=None, min_length=2, max_length=120),
+    db: Any = Depends(get_db),
+    admin_user: Any = Depends(require_admin),
+):
+    """Without ``q``: the existing admins (role-management overview).
+    With ``q``: search ALL users by email/name so a user can be found and
+    promoted — previously only existing admins were ever returned, making
+    promotion a dead-end (EMP-015)."""
+    user_model = resolve_model("User")
+    if q:
+        return [_admin_user_to_read(user) for user in _search_users(db, user_model, q)]
+    users = [_admin_user_to_read(user) for user in query_all(db, user_model) if "admin" in get_user_roles(user)]
     return users[:100]
 
 

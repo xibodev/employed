@@ -126,3 +126,35 @@ def test_report_serializer_wraps_uuid_fields_as_strings():
     assert read.reporter_user_id == str(reporter_id)
     assert read.resolved_by == str(resolver_id)
     assert read.reason == "spam"
+
+
+def test_admin_users_search_finds_non_admin_users(client, test_admin, user_factory, auth_headers):
+    """EMP-015 regression: without search, /admin/users only returned
+    existing admins — promotion was a dead-end. ?q= searches all users."""
+    target = user_factory(email="promote-me@example.com", display_name="Promote Me")
+    user_factory(email="bystander@example.com", display_name="By Stander")
+
+    response = client.get("/admin/users", params={"q": "promote-me"}, headers=auth_headers(test_admin))
+
+    assert response.status_code == 200
+    body = response.json()
+    assert [item["id"] for item in body] == [target.id]
+    assert body[0]["roles"] == []
+
+
+def test_admin_users_search_matches_display_name(client, test_admin, user_factory, auth_headers):
+    target = user_factory(email="someone@example.com", display_name="Carlos Empregador")
+
+    response = client.get("/admin/users", params={"q": "carlos"}, headers=auth_headers(test_admin))
+
+    assert response.status_code == 200
+    assert [item["id"] for item in response.json()] == [target.id]
+
+
+def test_admin_users_without_query_still_returns_only_admins(client, test_admin, test_user, auth_headers):
+    response = client.get("/admin/users", headers=auth_headers(test_admin))
+
+    assert response.status_code == 200
+    ids = [item["id"] for item in response.json()]
+    assert test_admin.id in ids
+    assert test_user.id not in ids

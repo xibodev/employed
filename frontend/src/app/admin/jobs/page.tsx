@@ -134,6 +134,10 @@ function AdminJobsContent() {
     await loadAdminState();
   };
 
+  const handleSearchUsers = useCallback(async (query: string) => {
+    return apiFetch<AdminUser[]>("/admin/users", { query: { q: query }, cache: "no-store" });
+  }, []);
+
   const handleGrantAdmin = async (adminUser: AdminUser) => {
     await apiFetch<void>(`/admin/users/${adminUser.id ?? adminUser._id}/roles/admin`, {
       method: "POST",
@@ -198,7 +202,12 @@ function AdminJobsContent() {
           {panelErrors.users ? (
             <p className="rounded-2xl bg-red-500/10 px-4 py-3 text-sm text-red-300">{panelErrors.users}</p>
           ) : null}
-          <AdminUsersList users={adminUsers} onGrant={handleGrantAdmin} onRevoke={handleRevokeAdmin} />
+          <AdminUsersList
+            users={adminUsers}
+            onGrant={handleGrantAdmin}
+            onRevoke={handleRevokeAdmin}
+            onSearch={handleSearchUsers}
+          />
           {panelErrors.reports ? (
             <p className="rounded-2xl bg-red-500/10 px-4 py-3 text-sm text-red-300">{panelErrors.reports}</p>
           ) : null}
