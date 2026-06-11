@@ -75,10 +75,16 @@ def is_email_verified(user: Any) -> bool:
             attr = getattr(first, "verified", None)
             if attr is not None:
                 return bool(attr)
-    oauth_only = any(
+    has_oauth_identity = bool(getattr(user, "oauth_providers", None)) or any(
         getattr(user, attr, None) for attr in ("google_id", "facebook_id", "github_id", "twitter_id", "oauth_provider")
     )
-    return oauth_only or not bool(get_primary_email(user))
+    if has_oauth_identity:
+        return True
+    # EMP-022: previously `oauth_only or not email` returned True for a row
+    # with NO email and NO OAuth identity, letting a malformed/legacy row
+    # pass email-verified gates (job posting, payments). Such rows are not
+    # verified.
+    return False
 
 
 def _unauthorized(detail: str = "Not authenticated") -> HTTPException:

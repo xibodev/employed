@@ -57,3 +57,20 @@ def test_resend_verification_for_verified_user_returns_already_verified(client, 
 
     assert response.status_code == 200
     assert response.json()["message"] == "Email already verified"
+
+
+def test_is_email_verified_false_for_row_without_email_or_oauth():
+    """EMP-022 regression: a malformed/legacy row with no email and no OAuth
+    identity must not pass email-verified gates."""
+    from types import SimpleNamespace
+
+    from app.auth.dependencies import is_email_verified
+
+    ghost = SimpleNamespace(email=None, email_verified=None, oauth_providers={})
+    assert is_email_verified(ghost) is False
+
+    oauth_user = SimpleNamespace(email=None, email_verified=None, oauth_providers={"google": "sub-1"})
+    assert is_email_verified(oauth_user) is True
+
+    legacy_oauth = SimpleNamespace(email=None, email_verified=None, oauth_providers={}, google_id="legacy-sub")
+    assert is_email_verified(legacy_oauth) is True
