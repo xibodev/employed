@@ -71,6 +71,15 @@ def query_all(
     return list(query.all())
 
 
+def query_count(db: Any, model: Any, filters: list | None = None) -> int:
+    """COUNT(*) push-down companion to query_all (EMP-010)."""
+    query = db.query(model)
+    if filters:
+        for f in filters:
+            query = query.filter(f)
+    return int(query.count())
+
+
 def query_by_user(db: Any, model: Any, user_id: Any, *, order_desc: bool = True) -> list[Any]:
     """Return rows from *model* owned by *user_id*, push-down where supported.
 

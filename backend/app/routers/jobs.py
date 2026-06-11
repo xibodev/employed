@@ -29,6 +29,7 @@ from app.services.model_utils import (
     get_by_id,
     query_all,
     query_by_user,
+    query_count,
     resolve_model,
     save,
     set_attr,
@@ -122,6 +123,79 @@ def _pushdown_list_jobs(db: Any, model: Any, market: dict) -> list[Any]:
 
     # TODO: push-down not available for this model — full scan (deprecation target)
     return query_all(db, model)
+
+
+def _like_pattern(needle: str) -> str:
+    escaped = needle.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+    return f"%{escaped}%"
+
+
+def _job_query_pushdown(
+    model: Any,
+    market: dict,
+    query: str | None,
+    jobtype: str | None,
+    remote: bool | None,
+    *,
+    featured_after: Any | None = None,
+):
+    """Build the full SQL predicate set for /jobs list/count (EMP-010).
+
+    Returns ``(filters, created_field)`` when every requested predicate can
+    be pushed to the database, or ``None`` to signal the Python fallback
+    (plain test rigs without ORM columns).
+    """
+    from sqlalchemy import func, or_
+
+    from app.services.model_utils import get_model_field
+
+    status_field = get_model_field(model, "status")
+    country_field = get_model_field(model, "country")
+    created_field = get_model_field(model, "created_at", "createdAt")
+    if status_field is None or country_field is None or created_field is None:
+        return None
+
+    cutoff = utcnow() - timedelta(days=90)
+    filters: list[Any] = [
+        status_field == "active",
+        country_field == market["country"],
+        created_field >= cutoff,
+    ]
+
+    if query and query.strip():
+        text_fields = [
+            get_model_field(model, "title"),
+            get_model_field(model, "company"),
+            get_model_field(model, "location"),
+        ]
+        conditions = [
+            func.lower(field).like(_like_pattern(query.strip().lower()), escape="\\")
+            for field in text_fields
+            if field is not None
+        ]
+        if not conditions:
+            return None
+        filters.append(or_(*conditions))
+
+    if jobtype:
+        jobtype_field = get_model_field(model, "jobtype", "job_type")
+        if jobtype_field is None:
+            return None
+        filters.append(jobtype_field == jobtype)
+
+    if remote is not None:
+        remote_field = get_model_field(model, "remote")
+        if remote_field is None:
+            return None
+        filters.append(remote_field == remote)
+
+    if featured_after is not None:
+        featured_field = get_model_field(model, "featured_through", "featuredThrough")
+        if featured_field is None:
+            return None
+        filters.append(featured_field >= featured_after)
+
+    return filters, created_field
 
 
 def _apply_filters(
@@ -273,8 +347,32 @@ def list_jobs(
     db: Any = Depends(get_db),
     market: dict = Depends(get_current_market),
 ):
-    # Push status/country/age predicates to the DB; apply text/type/remote in Python
-    candidates = _pushdown_list_jobs(db, _job_model(), market)
+    model = _job_model()
+    pushdown = _job_query_pushdown(model, market, query, jobtype, remote)
+    if pushdown is not None:
+        # EMP-010: search/type/remote predicates, COUNT(*), ORDER BY and
+        # LIMIT/OFFSET all run in SQL instead of materializing the market.
+        filters, created_field = pushdown
+        if jobtype and jobtype not in JOB_TYPES:
+            return JobListResponse(items=[], total=0, page=page, page_size=page_size)
+        total = query_count(db, model, filters)
+        items = query_all(
+            db,
+            model,
+            filters=filters,
+            order_by=created_field.desc(),
+            limit=page_size,
+            offset=(page - 1) * page_size,
+        )
+        return JobListResponse(
+            items=[_job_to_read(item, request) for item in items],
+            total=total,
+            page=page,
+            page_size=page_size,
+        )
+
+    # Fallback (test rigs without ORM columns): Python filtering
+    candidates = _pushdown_list_jobs(db, model, market)
     items = _apply_filters(candidates, market, query, jobtype, remote)
     start = (page - 1) * page_size
     end = start + page_size
@@ -293,12 +391,18 @@ def list_featured_jobs(
     market: dict = Depends(get_current_market),
 ):
     now = utcnow()
-    candidates = [
-        item
-        for item in _pushdown_list_jobs(db, _job_model(), market)
-        if get_attr(item, "featured_through", "featuredThrough")
-        and get_attr(item, "featured_through", "featuredThrough") >= now
-    ]
+    model = _job_model()
+    pushdown = _job_query_pushdown(model, market, None, None, None, featured_after=now)
+    if pushdown is not None:
+        filters, created_field = pushdown
+        candidates = query_all(db, model, filters=filters, order_by=created_field.desc())
+    else:
+        candidates = [
+            item
+            for item in _pushdown_list_jobs(db, model, market)
+            if get_attr(item, "featured_through", "featuredThrough")
+            and get_attr(item, "featured_through", "featuredThrough") >= now
+        ]
     sample_size = min(3, len(candidates))
     chosen = random.sample(candidates, sample_size) if sample_size else []
     return [_job_to_read(item, request) for item in chosen]
@@ -312,7 +416,14 @@ def count_jobs(
     db: Any = Depends(get_db),
     market: dict = Depends(get_current_market),
 ):
-    candidates = _pushdown_list_jobs(db, _job_model(), market)
+    model = _job_model()
+    pushdown = _job_query_pushdown(model, market, query, jobtype, remote)
+    if pushdown is not None:
+        if jobtype and jobtype not in JOB_TYPES:
+            return JobCountResponse(total=0)
+        filters, _ = pushdown
+        return JobCountResponse(total=query_count(db, model, filters))
+    candidates = _pushdown_list_jobs(db, model, market)
     items = _apply_filters(candidates, market, query, jobtype, remote)
     return JobCountResponse(total=len(items))
 

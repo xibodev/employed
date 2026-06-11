@@ -316,3 +316,59 @@ def test_admin_edit_of_active_job_keeps_status(
 
     assert response.status_code == 200
     assert response.json()["status"] == "active"
+
+
+def test_list_jobs_pushes_pagination_and_count_to_sql(client, job_factory, sample_market_headers, db_session):
+    """EMP-010 regression: /jobs must LIMIT/OFFSET and COUNT in SQL instead
+    of materializing every active row in Python."""
+    from sqlalchemy import event
+
+    for index in range(5):
+        job_factory(title=f"Engineer {index}")
+
+    statements: list[str] = []
+    engine = db_session.get_bind()
+
+    def record(conn, cursor, statement, parameters, context, executemany):
+        statements.append(statement)
+
+    event.listen(engine, "before_cursor_execute", record)
+    try:
+        response = client.get("/jobs?page=1&page_size=2", headers=sample_market_headers("mz"))
+    finally:
+        event.remove(engine, "before_cursor_execute", record)
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["total"] == 5
+    assert len(payload["items"]) == 2
+    joined = " ".join(s.lower() for s in statements)
+    assert "limit" in joined, f"no LIMIT pushed down: {statements}"
+    assert "count" in joined, f"no COUNT pushed down: {statements}"
+
+
+def test_count_endpoint_uses_sql_count_and_matches_list(client, job_factory, sample_market_headers):
+    job_factory(title="Remote Dev", remote=True)
+    job_factory(title="Office Dev", remote=False)
+    job_factory(title="Remote QA", remote=True)
+
+    count = client.get("/jobs/count?remote=true", headers=sample_market_headers("mz"))
+    listing = client.get("/jobs?remote=true", headers=sample_market_headers("mz"))
+
+    assert count.status_code == 200
+    assert count.json()["total"] == 2
+    assert listing.json()["total"] == 2
+
+
+def test_search_filter_results_unchanged_after_pushdown(client, job_factory, sample_market_headers):
+    job_factory(title="Backend Engineer", company="Acme")
+    job_factory(title="Designer", company="Beta Studio")
+    job_factory(title="Marketer", company="Acme", job_type="Part Time")
+
+    by_text = client.get("/jobs?query=acme", headers=sample_market_headers("mz"))
+    by_type = client.get("/jobs?jobtype=Part Time", headers=sample_market_headers("mz"))
+    invalid_type = client.get("/jobs?jobtype=Bogus", headers=sample_market_headers("mz"))
+
+    assert {item["title"] for item in by_text.json()["items"]} == {"Backend Engineer", "Marketer"}
+    assert [item["title"] for item in by_type.json()["items"]] == ["Marketer"]
+    assert invalid_type.json()["total"] == 0
