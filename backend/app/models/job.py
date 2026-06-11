@@ -25,12 +25,34 @@ if TYPE_CHECKING:
 
 class Job(Base):
     __tablename__ = "jobs"
-    __table_args__ = (sa.Index("ix_jobs_status_country_created_at", "status", "country", "created_at"),)
+    # EMP-009: index names/definitions mirror the ones created (partly via
+    # raw SQL) in alembic/versions/001_initial_schema.py so autogenerate
+    # does not propose duplicates or drops.
+    __table_args__ = (
+        sa.Index("idx_jobs_status_country_created", "status", "country", sa.text("created_at DESC")),
+        sa.Index("idx_jobs_user_id", "user_id"),
+        sa.Index(
+            "idx_jobs_featured",
+            "featured_through",
+            postgresql_where=sa.text("featured_through IS NOT NULL"),
+        ),
+        sa.Index(
+            "idx_jobs_title_trgm",
+            "title",
+            postgresql_using="gin",
+            postgresql_ops={"title": "gin_trgm_ops"},
+        ),
+        sa.Index(
+            "idx_jobs_company_trgm",
+            "company",
+            postgresql_using="gin",
+            postgresql_ops={"company": "gin_trgm_ops"},
+        ),
+    )
 
     user_id: Mapped[UUID | None] = mapped_column(
         PGUUID(as_uuid=True),
         sa.ForeignKey("users.id", ondelete="SET NULL"),
-        index=True,
     )
     title: Mapped[str] = mapped_column(sa.String(256), nullable=False)
     company: Mapped[str | None] = mapped_column(sa.String(256))

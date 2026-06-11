@@ -22,7 +22,16 @@ if TYPE_CHECKING:
 
 class PaymentIntent(Base):
     __tablename__ = "payment_intents"
-    __table_args__ = (sa.Index("ix_payment_intents_provider_ref", "provider_ref"),)
+    # EMP-009: mirrors the indexes created in 001_initial_schema.py
+    # (idx_payment_intents_provider_ref is partial there).
+    __table_args__ = (
+        sa.Index(
+            "idx_payment_intents_provider_ref",
+            "provider_ref",
+            postgresql_where=sa.text("provider_ref IS NOT NULL"),
+        ),
+        sa.Index("idx_payment_intents_job_user", "job_id", "user_id"),
+    )
 
     job_id: Mapped[UUID] = mapped_column(
         PGUUID(as_uuid=True),
