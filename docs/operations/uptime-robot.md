@@ -1,6 +1,13 @@
+---
+last_verified: 2026-06-11T02:02:49Z
+git_ref: fix/quality-run-2026-06-10 (uat baseline 00aa899)
+verified_by: doc-drift audit, quality run 2026-06-10_120309 (repo claims re-checked; monitor IDs/status from the 2026-05-29 live API probe)
+---
+
 # UptimeRobot Monitors -- employed.xibodev.com
 
-> Status: **LIVE.** Both intended monitors exist and are reporting UP.
+> Status: **LIVE.** Both intended monitors exist and are reporting UP
+> (last live-probed 2026-05-29).
 
 ## Active monitors
 

@@ -1,6 +1,6 @@
 # ADR-004: Bootstrap 5 phased migration
 
-**Status:** In progress (PR 1+2 complete, PR 3 pending)  
+**Status:** Superseded (2026-06-10) — PR 3 never shipped; the May 2026 rewrite replaced the Blaze/Bootstrap UI with Next.js + Tailwind CSS, making the migration moot (`MIGRATION-PLAN.md`). Kept as historical record.  
 **Date:** May 2026  
 **Context:** The app shipped with Bootstrap 3 (EOL July 2019) and Font Awesome 4. A single-PR migration would be too risky — the visual diff touches every template and the `useraccounts:bootstrap` package has no BS5 equivalent.  
 **Decision:** Split the migration into three PRs:

@@ -1,3 +1,9 @@
+---
+last_verified: 2026-06-11T02:02:49Z
+git_ref: fix/quality-run-2026-06-10 (uat baseline 00aa899)
+verified_by: doc-drift audit, quality run 2026-06-10_120309
+---
+
 # On-Call & Alert Routing
 
 > consolidated-011 / MON-01 / RD-04 — alert routing documentation.
@@ -6,11 +12,11 @@
 
 ### Current Stack
 
-| Layer | Tool | Owner |
-|-------|------|-------|
-| Error tracking | Sentry (`SENTRY_DSN` env var) | Dev team |
-| Uptime monitoring | UptimeRobot -> `/health` (HEAD, 5 min) | Ops |
-| Backup monitoring | Cron exit-code check on `backend/scripts/backup-db.sh` | Ops |
+| Layer | Tool | Status | Owner |
+|-------|------|--------|-------|
+| Error tracking | Sentry (`SENTRY_DSN` env var) | SDKs wired both ends; **no project/DSN provisioned yet** — no events flow until the operator provisions it (see `docs/operations/sentry-setup.md`) | Dev team |
+| Uptime monitoring | UptimeRobot -> `/health` (HEAD, 5 min) | **LIVE** — frontend + API monitors UP (see `docs/operations/uptime-robot.md`) | Ops |
+| Backup monitoring | Cron exit-code check on `backend/scripts/backup-db.sh` | Script exists in repo; cron **not confirmed configured** on Box 3 | Ops |
 
 ### Sentry Alert Rules (recommended)
 

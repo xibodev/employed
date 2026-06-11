@@ -1,7 +1,15 @@
+---
+last_verified: 2026-06-11T02:02:49Z
+git_ref: fix/quality-run-2026-06-10 (uat baseline 00aa899)
+verified_by: doc-drift audit, quality run 2026-06-10_120309
+---
+
 # Operations Runbook
 
 > Incident response, log triage, and operational procedures for Employed.
 > Stack: FastAPI + Next.js 15 · PostgreSQL 16 · Redis 7 · Docker Compose · Box 3 (`109.123.241.71`)
+>
+> URLs below are the **current UAT** hostnames (env-derived domain — Rule 2).
 
 ---
 
@@ -36,6 +44,12 @@ docker compose ps               # all services running?
 docker compose logs --tail=50 backend
 docker compose logs --tail=50 frontend
 ```
+
+> **Known cosmetic state on the live box:** the `worker` container may show
+> "unhealthy" — it inherited the API image's HTTP healthcheck while running
+> arq (no HTTP server). The repo's `deploy/docker-compose.prod.yml` already
+> carries a Redis-ping healthcheck for the worker; it takes effect on the
+> next deploy. arq jobs run regardless.
 
 ---
 
@@ -163,8 +177,8 @@ The arq `worker` service runs these background tasks:
 
 | Task | Schedule | Effect | Reversible? |
 |------|----------|--------|-------------|
-| `deactivate_expired_jobs` | Daily | Sets jobs older than 90 days to `inactive` | Yes — update status back to `active` |
-| Account deletion | Daily | Deletes users with pending deletion requests + their jobs | **No — irreversible** |
+| Job expiry | Daily | Sets active jobs older than 90 days to `inactive`, recording `expired_at` and a `status_history` reason (audit trail added on the fix branch) | Yes — update status back to `active` |
+| Account deletion | Daily | Hard-deletes users whose scheduled deletion date (request + 30 days) has passed, plus their jobs | **No — irreversible** |
 
 Run a backup before any deploy that includes changes to these tasks.
 
@@ -191,8 +205,8 @@ To rotate a secret:
 ## Scaling / resource notes
 
 - Backend: FastAPI with uvicorn workers. For higher load, increase `--workers` in the backend `command` in `docker-compose.prod.yml`.
-- Redis: used for arq job queue + session caching. No persistence needed (in-memory only).
-- PostgreSQL: data stored in a named Docker volume `postgres_data`. Back up regularly.
+- Redis: used for the arq job queue and refresh-token JTI revocation (live today), plus rate limiting, login lockout, and webhook replay dedupe once the fix branch deploys. Deliberately ephemeral (no persistence) — a restart clears TTL-bounded counters/revocations by design. There is no session store; auth is JWT.
+- PostgreSQL: data stored in a named Docker volume `postgres_data`. Back up regularly (see `docs/operations/postgres-backup.md`).
 
 ---
 

@@ -1,5 +1,10 @@
 # Screenshot Analysis Fix Plan
 
+> **Point-in-time artifact** from quality run `2026-05-25_092945`. Superseded
+> by the 2026-06-10 run (`.quality-run/results/2026-06-10_120309/` —
+> `fix-plan/execution-plan.json` and `docs/product/BACKLOG.md` are the
+> current trackers). Item statuses below are NOT maintained.
+
 ## Executive Summary
 
 - **Source inputs:** `.quality-run/results/2026-05-25_092945/screenshot-analysis/fix-plan.json` and `summary.md`

@@ -1,4 +1,10 @@
+<!-- last_verified: 2026-06-11T02:02:49Z | git_ref: fix/quality-run-2026-06-10 | verified_by: doc-drift audit, quality run 2026-06-10_120309 -->
+
 # Employed - Architecture Notes
+
+> Detailed observed-state maps live in `docs/architecture/` (API map, route
+> map, data model, config & secrets map, deployment topology). Prefer those
+> for anything load-bearing; this file is the short orientation.
 
 ## Overview
 
@@ -39,9 +45,10 @@ Employed is a FastAPI + Next.js job board for localized markets. Market context 
 
 ```bash
 npm run lint
-cd backend && python -m pytest
+cd backend && python -m pytest      # 134 tests as of fix/quality-run-2026-06-10
 cd frontend && npm run build
 cd frontend && npm run typecheck
+npx playwright test tests/e2e/      # requires a running app stack
 ```
 
 ## Local Development Notes
@@ -65,16 +72,16 @@ cd frontend && npm run typecheck
 
 ## Notes
 
-- Historical Meteor migration documents remain in the repo as reference only.
-- Root-level `docker-compose*.yml` no longer describe the full application runtime.
+- Historical Meteor migration documents remain in the repo as reference only (`MIGRATION-PLAN.md`, `docs/meteor-3-package-audit.md`, `docs/decisions/001`–`004`, `docs/archive/`).
+- All compose files live under `deploy/`; there are no root-level `docker-compose*.yml` files.
 - The project was originally imported from `nate-strauser/wework`; the current codebase is now a separate FastAPI + Next.js implementation.
 
 ## Env var conventions
 
-Standard env var names are used where applicable: `SENTRY_DSN`, `SENTRY_ENVIRONMENT`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `NEXT_PUBLIC_API_URL`. See `.env.example` and service-specific env examples.
+Standard env var names are used where applicable: `SENTRY_DSN`, `SENTRY_ENVIRONMENT`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_APP_URL` (deployment domain — never hardcode it in source), `FRONTEND_BASE_URL` (email link base). See `deploy/.env.example`, `frontend/.env.example`, and `docs/architecture/CONFIG_AND_SECRETS_MAP.md`.
 
 ## AI Assistant Rules
 
-- No `Co-Authored-By: Claude` trailers, no AI authorship attribution in docs or commits (AI-OPS Rule 6).
-- Never paste credentials into chat. Use file paths to reference secrets (AI-OPS Rule 5).
+- No `Co-Authored-By: Claude` trailers, no AI authorship attribution in docs or commits (AI-OPS Rule 5).
+- Never paste credentials into chat. Use file paths to reference secrets (AI-OPS Rule 4).
 - Locale codes: `en`, `pt`, `es` only (STANDARDS §4).

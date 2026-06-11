@@ -1,6 +1,12 @@
-# Employed — `SERVICES.md` (proposed replacement)
+<!-- last_verified: 2026-06-11T02:02:49Z | git_ref: fix/quality-run-2026-06-10 (uat baseline 00aa899) | verified_by: doc-drift audit, quality run 2026-06-10_120309 -->
 
-> Drop-in replacement for `E:\startup projects\employed.co.mz\SERVICES.md`. Conforms to the per-product doc shape locked 2026-05-27 (see `00-DECISIONS-LOCKED.md` §9).
+# Employed — `SERVICES.md` (in-repo copy)
+
+> The **canonical** live-state copy lives at the wrapper level:
+> `E:\startup projects\employed.co.mz\SERVICES.md` (outside this git repo).
+> This in-repo copy is kept in sync for repo-local reference; if they
+> disagree, trust the wrapper copy. Conforms to the per-product doc shape
+> locked 2026-05-27 (see `00-DECISIONS-LOCKED.md` §9).
 
 ---
 
@@ -19,20 +25,35 @@ Multilingual job board for Mozambique and Mexico. Companies post jobs, candidate
 
 Repo/folder slug `employed.co.mz` is retained. Live infrastructure uses the shorter brand slug `employed` for `/opt/employed/`, GHCR images, and observability resource names.
 
-## Live state — 2026-05-28
+## Live state — verified 2026-06-10 (deployed build: `uat` @ `00aa899`)
 
 | Surface | State |
 |---------|-------|
 | Backend API | 🟢 **LIVE.** `https://api.employed.xibodev.com/health` returns `200` with DB + Redis OK. FastAPI container on Box 3 via Caddy. |
 | Frontend | 🟢 **LIVE.** `https://employed.xibodev.com/` is a self-hosted Next.js container on Box 3. No Vercel project exists for Employed. |
-| Market hosts | 🟢 **LIVE.** `mx.employed.xibodev.com` and `mz.employed.xibodev.com` reverse-proxy to the same frontend and select market by hostname. |
+| Market hosts | 🟢 **LIVE** (with caveat). `mx.employed.xibodev.com` and `mz.employed.xibodev.com` reverse-proxy to the same frontend. **Live bug:** the deployed backend ignores `X-Forwarded-Host`, so the MX host serves MZ data (EMP-001 — fixed on the pending branch). |
 | Brand domain `employed.co.mz` | 🔴 **NOT ROUTED.** Public DNS is NXDOMAIN; no Cloudflare zone found. Treat as future/prod-domain workstream until ownership/delegation is resolved. |
 | PostgreSQL | 🟢 **LIVE.** `postgres:16-alpine` in the Box 3 compose stack with `postgres_data` volume. |
-| Redis | 🟢 **LIVE.** `redis:7-alpine` in the Box 3 compose stack; used for arq queue, sessions, and caching. |
-| Worker | 🟠 **FALSE-NEGATIVE UNHEALTHY.** arq jobs run, but the worker inherits the API image HTTP `/health` Docker healthcheck. |
-| Email | 🟡 **WORKING VIA APEX.** Resend SMTP uses verified `xibodev.com`; Employed-specific Resend domain is not verified yet. |
-| Sentry | 🔴 **PENDING.** No Employed project/DSN found; current deps do not wire Sentry. |
-| UptimeRobot | 🔴 **PENDING.** No Employed monitors found. |
+| Redis | 🟢 **LIVE.** `redis:7-alpine` in the Box 3 compose stack; used today for the arq queue and refresh-JTI revocation (no session store — auth is JWT). The pending branch additionally moves rate-limit/lockout counters and webhook replay dedupe into Redis. |
+| Worker | 🟠 **FALSE-NEGATIVE UNHEALTHY (live box).** arq jobs run, but the deployed container still uses the inherited HTTP healthcheck. The Redis-ping healthcheck fix is already committed in `deploy/docker-compose.prod.yml` — takes effect on the next deploy. |
+| Email | 🟡 **WORKING VIA APEX, BROKEN LINKS.** Resend SMTP via verified `xibodev.com` delivers, but the deployed build's verification/reset links target the API host and 405 on click (EMP-004 — fixed on the pending branch, which links via `FRONTEND_BASE_URL`). |
+| Anonymous job posting | 🔴 **BROKEN on live.** reCAPTCHA secret resolution + action mismatch make anonymous posting always fail (EMP-002/003 — fixed on the pending branch). |
+| Admin moderation | 🔴 **BROKEN on live when reports exist.** `GET /admin/reports` 500s and blanks the admin UI (EMP-026 — fixed on the pending branch). |
+| Sentry | 🟡 **WIRED, NOT PROVISIONED.** Backend `init_sentry()` and frontend `@sentry/nextjs` configs ship in the deployed build (no-op without DSN). No Employed Sentry project/DSN exists yet — provisioning + `SENTRY_DSN` env remain pending (EMP-011). |
+| UptimeRobot | 🟢 **LIVE.** Frontend monitor `employed.xibodev.com` (id `803170467`) UP; API monitor `employed-api-uat` (id `803177488`, `/health`) UP. See `docs/operations/uptime-robot.md`. |
+
+### Pending release — branch `fix/quality-run-2026-06-10` (NOT deployed)
+
+28 fix commits + docs, **local-only (unmerged, unpushed)**. Live Box 3 runs
+pre-fix `uat` @ `00aa899`. Branch-only behavior (do not expect it on the live
+box): httpOnly `employed_refresh_token` cookie (refresh out of localStorage),
+Redis-backed rate limit/lockout, X-Forwarded-Host market resolution,
+frontend-targeted email links, working anonymous-post reCAPTCHA, admin
+reports fix, runtime `window.__ENV` config, mandatory mobile-money webhook
+timestamps. Pre-deploy gates (BL-001/BL-002): extend the `deploy-uat.yml` env
+upsert with `FRONTEND_BASE_URL`, `NEXT_PUBLIC_APP_URL`, `CORS_ORIGINS`,
+`ENVIRONMENT`, `SENTRY_DSN`, `SENTRY_ENVIRONMENT`. Full detail:
+`docs/product/RELEASE_NOTES.md`.
 
 ---
 
@@ -86,12 +107,14 @@ Repo/folder slug `employed.co.mz` is retained. Live infrastructure uses the shor
 | Resend reality | `xibodev.com` and `adsbridge.xibodev.com` verified; no Employed domain verified yet |
 | Target | Verify `employed.xibodev.com` in Resend, then switch to `noreply@employed.xibodev.com`; defer `employed.co.mz` sender until `.mz` DNS exists |
 
-### OAuth — Google sign-in
+### Authentication
 | | |
 |---|---|
-| Providers live | Google only |
-| Callback | `https://api.employed.xibodev.com/auth/oauth/google/callback` |
-| Env | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` |
+| Primary auth | Full email/password accounts: register + email verification, login, forgot/reset password. JWT bearer access tokens (30 min) + refresh tokens (7 days). |
+| Live (deployed `00aa899`) | Refresh token returned in the response body and persisted by the frontend in localStorage; login lockout is in-process per container; refresh-JTI revocation in Redis. **Live bug:** verification/reset email links target the API host → 405 on click (EMP-004). |
+| Pending on branch `fix/quality-run-2026-06-10` (unmerged) | httpOnly `employed_refresh_token` cookie scoped to `/auth` (SameSite=Lax, Secure outside dev); frontend no longer persists refresh tokens in localStorage; (email, client IP) lockout moved to Redis; email links built from `FRONTEND_BASE_URL`; OAuth email-linking requires the provider's verified-email claim (EMP-018). |
+| OAuth providers live | Google only (`https://api.employed.xibodev.com/auth/oauth/google/callback`) |
+| OAuth env | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` |
 | Current credential note | Product docs mention GCP project `employed-uat-1779918377033` |
 | Target | Move OAuth/reCAPTCHA clients into the shared `xibodev.com` GCP project per portfolio standard |
 
@@ -100,16 +123,16 @@ Facebook, GitHub, and Twitter OAuth env slots exist in examples, but those provi
 ### Payments
 | Provider | Market | State | Env |
 |----------|--------|-------|-----|
-| Stripe | MX + MZ | Test keys configured; webhook endpoint exists at `POST /_stripe/webhook` | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PUBLISHABLE_KEY` |
-| M-Pesa | MZ | Simulator mode unless webhook secret/sandbox credentials are present | `MPESA_WEBHOOK_SECRET` |
-| e-Mola | MZ | Simulator mode unless webhook secret/sandbox credentials are present | `EMOLA_WEBHOOK_SECRET` |
+| Stripe | MX + MZ | Test keys configured; webhook endpoint is `POST /webhooks/_stripe/webhook` (router mounted under `/webhooks` — the bare `/_stripe/webhook` path 404s; verify the Stripe dashboard endpoint URL matches) | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PUBLISHABLE_KEY` |
+| M-Pesa | MZ | Simulator mode (`MPESA_SIMULATOR`, default true); live adapter not implemented. Callback `POST /webhooks/_mpesa/callback`; pending branch makes the payload timestamp mandatory | `MPESA_SIMULATOR`, `MPESA_WEBHOOK_SECRET` |
+| e-Mola | MZ | Simulator mode (`EMOLA_SIMULATOR`, default true); live adapter not implemented. Callback `POST /webhooks/_emola/callback` | `EMOLA_SIMULATOR`, `EMOLA_WEBHOOK_SECRET` |
 
 ### reCAPTCHA v3
 | | |
 |---|---|
-| Purpose | Job submission abuse protection |
-| Env | `RECAPTCHA_SECRET_KEY`, `NEXT_PUBLIC_RECAPTCHA_SITE_KEY` |
-| Current state | UAT keys present in GitHub secrets; frontend site key is baked at image build time |
+| Purpose | Anonymous job-submission abuse protection (action `submit_job`, min score `RECAPTCHA_MIN_SCORE`) |
+| Env | `RECAPTCHA_SECRET_KEY`, `NEXT_PUBLIC_RECAPTCHA_SITE_KEY`, `RECAPTCHA_MIN_SCORE`, `RECAPTCHA_BYPASS_IN_DEVELOPMENT` |
+| Current state | UAT keys present in GitHub secrets. **Live build broken** for anonymous posting (secret resolution + action mismatch, EMP-002/003 — fixed on the pending branch). Live frontend bakes the site key at build time; the pending branch serves it at runtime via `window.__ENV`. |
 
 ---
 
@@ -117,11 +140,11 @@ Facebook, GitHub, and Twitter OAuth env slots exist in examples, but those provi
 
 | Channel | Project / config |
 |---------|------------------|
-| Sentry | org `nmtss`. Target projects: `employed-api` + `employed-frontend`. **Not provisioned/wired yet.** |
+| Sentry | org `nmtss`. Target projects: `employed-api` + `employed-frontend`. **SDKs wired both ends** (backend `init_sentry()`; frontend `@sentry/nextjs` client/server/edge configs) — no-op until DSN set. **Projects/DSNs not provisioned yet** (EMP-011 operator TODO). |
 | New Relic | app name pattern `employed-api-uat`, `employed-frontend-uat`, optionally `employed-worker-uat`. **Agent not installed yet.** |
-| UptimeRobot | target monitors to create: API `https://api.employed.xibodev.com/health`; frontend `https://employed.xibodev.com/`. No monitor IDs yet. |
+| UptimeRobot | 🟢 LIVE — frontend monitor `employed.xibodev.com` (id `803170467`) and API monitor `employed-api-uat` (id `803177488`, `/health`), 5-min interval. See `docs/operations/uptime-robot.md`. |
 | Loki / Grafana / Promtail | **NOT USED.** Retired with Box A. |
-| Health endpoints | API has `/health`; `/healthz?db=1` and `/metrics` are stale doc references unless implemented later. |
+| Health endpoints | API `/health` (GET + HEAD); frontend `/api/health`. No `/healthz` or `/metrics` endpoints exist. |
 
 ---
 
@@ -142,9 +165,9 @@ Facebook, GitHub, and Twitter OAuth env slots exist in examples, but those provi
 | | |
 |---|---|
 | Workflow | `.github/workflows/ci.yml` |
-| Trigger | push to `main`, all pull requests |
+| Trigger | push to `main`/`master`/`uat`, all pull requests |
 | Jobs | backend Ruff lint/format, backend pytest, frontend ESLint/TypeScript, frontend build |
-| Branch gap | GitHub default branch is still `master`; local/deploy branch is `uat`; align `master` → `main` or add `master` to CI until rename. |
+| Branch note | GitHub default branch is still `master` (rename to `main` pending); deploy branch is `uat`. Deploy is not gated on CI (hardening TODO). |
 
 ### One-time init
 | | |
@@ -162,12 +185,13 @@ Facebook, GitHub, and Twitter OAuth env slots exist in examples, but those provi
 | `APP_NAME` | `Employed API` | Default in `backend/app/config.py` already matches brand. |
 | `DATABASE_URL` | `postgresql://employed:<secret>@postgres:5432/employed` | In-compose Postgres on Box 3. |
 | `REDIS_URL` | `redis://redis:6379/0` | In-compose Redis on Box 3. |
-| `NEXT_PUBLIC_API_URL` | `https://api.employed.xibodev.com` | Baked into frontend image during deploy. |
+| `NEXT_PUBLIC_API_URL` | `https://api.employed.xibodev.com` | Live build: baked at image build. Pending branch: served at runtime via `window.__ENV` (build-arg only a fallback). |
+| `FRONTEND_BASE_URL` / `NEXT_PUBLIC_APP_URL` / `CORS_ORIGINS` / `ENVIRONMENT` | not yet set on Box 3 | Required by the pending branch; must be added to the `deploy-uat.yml` upsert before it deploys (BL-001). |
 | `FROM_EMAIL` | `Employed <noreply@xibodev.com>` now | Switch to `noreply@employed.xibodev.com` after Resend verification. |
 | `ADMIN_EMAIL` | `admin@employed.co.mz` | Current deploy value; verify mailbox/domain before relying on it. |
 | `SMTP_*` | Resend SMTP relay | UAT uses port `465` + SSL. |
 | `GOOGLE_CLIENT_ID/SECRET` | present in GH secrets | Google-only OAuth for now. |
-| `RECAPTCHA_*` | present in GH secrets | Frontend site key is build-time. |
+| `RECAPTCHA_*` | present in GH secrets | Live: site key build-time; pending branch: runtime via `window.__ENV`. |
 | `STRIPE_*` | test keys | Live keys required before real payments. |
 | `MPESA_WEBHOOK_SECRET` / `EMOLA_WEBHOOK_SECRET` | absent/pending | Absence means simulator mode. |
 | `SENTRY_DSN` / `SENTRY_ENVIRONMENT` | pending | Add after projects/SDKs are provisioned. |
@@ -177,24 +201,25 @@ Facebook, GitHub, and Twitter OAuth env slots exist in examples, but those provi
 
 ## TODO — critical path to make UAT release-gated
 
-1. **Fix worker health status.** Override the inherited API Docker `HEALTHCHECK` for `worker` in production compose: either `healthcheck: { disable: true }` or a Redis/arq-specific liveness check.
-2. **Create UptimeRobot monitors** for `https://api.employed.xibodev.com/health` and `https://employed.xibodev.com/`; record monitor IDs here.
-3. **Provision and wire Sentry**: create `employed-api` + `employed-frontend` in org `nmtss`, add SDK deps/config, set `SENTRY_DSN` and `SENTRY_ENVIRONMENT=uat`.
+0. **NEW (hard pre-deploy gate, BL-001/BL-002):** extend the `deploy-uat.yml` env upsert with `FRONTEND_BASE_URL`, `NEXT_PUBLIC_APP_URL`, `CORS_ORIGINS`, `ENVIRONMENT`, `SENTRY_DSN`, `SENTRY_ENVIRONMENT` before merging/deploying `fix/quality-run-2026-06-10`.
+1. ~~**Fix worker health status.**~~ **DONE in repo** — Redis-ping healthcheck committed in `deploy/docker-compose.prod.yml`; takes effect on the next deploy (live box still shows the false-negative until then).
+2. ~~**Create UptimeRobot monitors.**~~ **DONE 2026-05-29.** Frontend `803170467` and API `803177488` (`/health`) both LIVE. See `docs/operations/uptime-robot.md`.
+3. **Provision Sentry**: create `employed-api` + `employed-frontend` in org `nmtss` and set `SENTRY_DSN` + `SENTRY_ENVIRONMENT=uat` in the deploy env. (SDK wiring already done on both ends — backend `init_sentry()`, frontend `@sentry/nextjs`.)
 4. **Install/configure New Relic** for API/frontend (and worker if supported); use brand/env app names above.
 5. **Verify `employed.xibodev.com` in Resend** and switch `FROM_EMAIL` after verification. Until then, keep `noreply@xibodev.com`.
 6. **Resolve `.mz` domain ownership/delegation** before adding production-domain DNS or Caddy routes.
-7. **Align branch policy**: keep `uat` deploy branch, then rename `master` → `main` or add `master` to CI until the rename is done.
-8. **Confirm M-Pesa and e-Mola sandbox credentials** before mobile-money UAT journeys that claim real provider coverage.
+7. **Align branch policy**: keep `uat` deploy branch, then rename `master` → `main` (CI already covers `master` and `uat`).
+8. **Confirm M-Pesa and e-Mola sandbox credentials** before mobile-money UAT journeys that claim real provider coverage. (Pending branch makes the callback timestamp mandatory — confirm providers send one.)
 
 ## TODO — cleanup (post-restore)
 
-- Replace old shared-doc claims that Employed is Meteor/Mongo/Node 18 or Vercel-hosted; current stack is FastAPI + Next.js + PostgreSQL/Redis on Box 3.
-- Update `deploy/.env.example` sender from `Employed <admin@employed.co.mz>` to the safe UAT sender until an Employed-specific domain is verified.
-- Update `docs/operations/oncall.md`: UptimeRobot should target `/health`; remove `/healthz?db=1` and `/metrics` unless implemented.
-- Update `PITCH.md` references to Box A and already-wired Sentry.
-- Update GitHub repo description from the old Meteor job-board wording.
+- Replace old shared-doc claims that Employed is Meteor/Mongo/Node 18 or Vercel-hosted; current stack is FastAPI + Next.js + PostgreSQL/Redis on Box 3. *(In-repo docs swept 2026-06-10 — remaining instances live only in central/shared docs.)*
+- ~~Update `deploy/.env.example` sender from `Employed <admin@employed.co.mz>` to the safe UAT sender.~~ **DONE 2026-06-10** (now `Employed <noreply@xibodev.com>`).
+- ~~Update `docs/operations/oncall.md`: UptimeRobot should target `/health`; remove `/healthz?db=1` and `/metrics` unless implemented.~~ **DONE 2026-05-28** (HEAD/405 fix + doc sync).
+- ~~Update `PITCH.md` references to Box A and already-wired Sentry.~~ **DONE 2026-06-10** (Box A removed; Sentry stated as wired-not-provisioned; test counts corrected).
+- Update GitHub repo description from the old Meteor job-board wording. *(Verified still stale 2026-06-10: "A Meteor based Job Board".)*
 - Move current Google OAuth/reCAPTCHA credentials into the shared `xibodev.com` GCP project when rotating credentials.
-- Keep historical Meteor migration docs clearly archived/reference-only.
+- ~~Keep historical Meteor migration docs clearly archived/reference-only.~~ **DONE 2026-06-10** (banners on `docs/meteor-3-package-audit.md`, `docs/ads-strategy.md`, ADRs 001–004 marked Superseded, CHANGELOG Meteor era fenced off).
 
 ## TODO — backlog
 

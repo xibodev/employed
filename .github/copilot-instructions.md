@@ -12,8 +12,12 @@ Frontend is in `frontend/`; backend is in `backend/`.
 2. **Never paste credentials** — reference file paths, not values.
 3. **Locale codes** — `en`, `pt`, `es` only. Expand together across all products.
 4. **Env var naming** — use standard names: `SENTRY_DSN`, `STRIPE_SECRET_KEY`,
-   `STRIPE_WEBHOOK_SECRET`, `RESEND_API_KEY`, `EMAIL_FROM`, `NEXT_PUBLIC_API_URL`.
-5. **Secrets posture** — never commit `.env`. See `.env.example` and service env examples.
+   `STRIPE_WEBHOOK_SECRET`, `FROM_EMAIL`, `NEXT_PUBLIC_API_URL`,
+   `NEXT_PUBLIC_APP_URL`, `FRONTEND_BASE_URL`. (Email goes through the Resend
+   SMTP relay: `SMTP_PASSWORD` carries the Resend API key — there is no
+   `RESEND_API_KEY` var in the app env.) Full map:
+   `docs/architecture/CONFIG_AND_SECRETS_MAP.md`.
+5. **Secrets posture** — never commit `.env`. See `deploy/.env.example` and `frontend/.env.example`.
 6. **Port allocation** — frontend defaults to `localhost:3000`, backend to `localhost:8000`, MailHog to `8025` when used.
 
 ## Key files
@@ -45,6 +49,12 @@ UAT is live on Box 3 and stable, so the next priority is hardening
 the gaps below on UAT. Each item should ship as its own PR with a green CI
 run before merge.
 
+> **Hard pre-deploy gate for branch `fix/quality-run-2026-06-10` (BL-001):**
+> the `deploy-uat.yml` env upsert must first add `FRONTEND_BASE_URL`,
+> `NEXT_PUBLIC_APP_URL`, `CORS_ORIGINS`, `ENVIRONMENT`, `SENTRY_DSN`,
+> `SENTRY_ENVIRONMENT` — see `docs/architecture/DEPLOYMENT_TOPOLOGY.md`
+> § "Deploy-time env gaps".
+
 Concrete gaps (in priority order):
 
 1. **Gate deploy on CI.** Today `deploy-uat.yml` triggers on every push to
@@ -58,10 +68,12 @@ Concrete gaps (in priority order):
    `IMAGE_TAG` in `.env` and `docker compose pull` + `up -d` uses the SHA.
    This is the foundation for rollback and for promoting an exact UAT image
    into prod.
-3. **Run Alembic migrations as part of deploy.** `backend/alembic/versions/`
-   exists but the workflow never executes `alembic upgrade head`. Add a
-   `docker compose run --rm backend alembic upgrade head` step after `pull`
-   and before `up -d`. Fail the deploy if it errors.
+3. **Surface migration failures in the deploy.** Migrations DO run — the
+   compose `migrate` service executes `alembic upgrade head` before
+   backend/worker start — but the workflow doesn't surface a migration
+   failure as a deploy failure. Add an explicit
+   `docker compose run --rm migrate` step (or check the service exit code)
+   after `pull` and before `up -d`, and fail the deploy if it errors.
 4. **One-command rollback.** Add `scripts/rollback-uat.sh` that takes a prior
    SHA, edits `/opt/employed/.env`'s `IMAGE_TAG`, pulls, and restarts. Once
    step 2 ships, this becomes trivial.
@@ -75,9 +87,10 @@ Concrete gaps (in priority order):
    Extend to: frontend `/`, both market hosts (`mx.employed.xibodev.com`,
    `mz.employed.xibodev.com`), and at least one read-only API journey
    (e.g. `GET /jobs?limit=1`). Fail the deploy on any non-2xx.
-8. **Worker healthcheck override.** Worker container inherits the API's
-   `/health` healthcheck, so it always reads "unhealthy" (see outer
-   `SERVICES.md` TODO §1). Override in `deploy/docker-compose.prod.yml`.
+8. **Worker healthcheck override — DONE in repo, pending deploy.** A
+   Redis-ping healthcheck for the worker is committed in
+   `deploy/docker-compose.prod.yml`; the live box keeps showing the
+   false-negative "unhealthy" until the next deploy ships it.
 9. **Image vulnerability scan.** Add a Trivy scan step on the built image
    *before* push; fail on HIGH/CRITICAL. Acceptable allow-list lives in
    `.trivyignore`.

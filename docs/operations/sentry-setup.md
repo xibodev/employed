@@ -1,12 +1,27 @@
+---
+last_verified: 2026-06-11T02:02:49Z
+git_ref: fix/quality-run-2026-06-10 (uat baseline 00aa899)
+verified_by: doc-drift audit, quality run 2026-06-10_120309
+---
+
 # Sentry Setup
 
 > docs/operations/sentry-setup.md — P-018
+>
+> **Provisioning status:** the SDK wiring below is in place, but **no Sentry
+> project or DSN exists yet for Employed** — nothing is reported from any
+> environment. Operator TODO (EMP-011): create `employed-api` +
+> `employed-frontend` in org `nmtss`, then set `SENTRY_DSN` /
+> `SENTRY_ENVIRONMENT` in the deploy env (the deploy workflow does not yet
+> upsert them).
 
 ---
 
 ## Overview
 
-Both the FastAPI backend and the Next.js frontend are instrumented with Sentry.
+Both the FastAPI backend (`app/observability.py#init_sentry`) and the Next.js
+frontend (`@sentry/nextjs` via `sentry.client/server/edge.config.ts`) are
+instrumented with Sentry.
 When the relevant env vars are not set (e.g. in local development or CI) Sentry
 is a complete no-op — no imports fail, no network traffic is generated.
 

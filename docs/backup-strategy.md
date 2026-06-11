@@ -1,6 +1,18 @@
+---
+last_verified: 2026-06-11T02:02:49Z
+git_ref: fix/quality-run-2026-06-10 (uat baseline 00aa899)
+verified_by: doc-drift audit, quality run 2026-06-10_120309
+---
+
 # Backup Strategy & Disaster Recovery
 
 > employed.co.mz — PostgreSQL 16 on Box 3 (`109.123.241.71`)
+>
+> **Status: requires-verification.** This document defines the target
+> procedure. Whether the backup cron and off-site sync are actually
+> configured on Box 3 has NOT been verified — confirm on-box
+> (`crontab -l`, `ls /backups`) before relying on it. Reference script:
+> `backend/scripts/backup-db.sh`.
 
 ---
 
@@ -8,9 +20,9 @@
 
 | Store | RPO | RTO | Notes |
 |-------|-----|-----|-------|
-| PostgreSQL (jobs, users, payment_intents, job_reports, profiles) | 1 hour | 4 hours | Primary business data — Docker volume `postgres_data` |
+| PostgreSQL (jobs, users, payment_intents, reports, profiles) | 1 hour | 4 hours | Primary business data — Docker volume `postgres_data` |
 | Stripe event log | N/A | N/A | Stripe retains this; webhook replay available via Stripe dashboard |
-| Redis | N/A | Minutes | Ephemeral cache/queue — no backup needed |
+| Redis | N/A | Minutes | Ephemeral queue/limits/revocation — no backup needed (TTL-bounded by design) |
 
 ---
 

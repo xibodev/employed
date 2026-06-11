@@ -2,6 +2,14 @@
 
 Status: **draft · v1** · 2026-05-22
 
+> **Implementation note (2026-06-10):** this strategy was written against the
+> retired Meteor app — the code links below (`server/*.js`,
+> `client/views/*`) no longer exist, and the Phase-0 mock `adSlot` component
+> was **not** carried into the current Next.js frontend (no ad surfaces are
+> implemented today). The market/economics analysis still stands as product
+> strategy; the implementation plan needs re-scoping against
+> `frontend/src/components/` before any phase ships.
+
 > Goal: **cover ~$20/mo server cost within 60 days**, without breaking the
 > trust the employer side (the actual revenue) is built on. AdSense is a
 > *fallback*, not the primary tool.

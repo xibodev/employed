@@ -1,8 +1,27 @@
+---
+last_verified: 2026-06-11T02:02:49Z
+git_ref: fix/quality-run-2026-06-10 (uat baseline 00aa899)
+verified_by: doc-drift audit, quality run 2026-06-10_120309
+---
+
 # Settings Reference
 
 > Environment variable reference for the FastAPI backend and Next.js frontend.
-> All env vars are injected at runtime via `/opt/employed/.env` on Box 3.
-> See `deploy/.env.example` for a local development template.
+> On Box 3 all values are injected at runtime via `/opt/employed/.env`
+> (upserted by `deploy-uat.yml`). Local template: `deploy/.env.example`.
+> Var × consumer map: `docs/architecture/CONFIG_AND_SECRETS_MAP.md`.
+>
+> Principle (AI-OPS Rule 11): mutable values are runtime config — a change is
+> a restart, not a rebuild. The backend reads settings through
+> `backend/app/config.py` (pydantic-settings, case-insensitive, `.env`
+> support). Frontend `NEXT_PUBLIC_API_URL` / `NEXT_PUBLIC_RECAPTCHA_SITE_KEY`
+> are served per-request via `window.__ENV` (`RuntimeEnvScript`) — the Docker
+> build args remain only as fallbacks.
+>
+> **Deploy gap:** `deploy-uat.yml` does not yet upsert `FRONTEND_BASE_URL`,
+> `NEXT_PUBLIC_APP_URL`, `CORS_ORIGINS`, `ENVIRONMENT`, `SENTRY_DSN`,
+> `SENTRY_ENVIRONMENT` — required before deploying the current branch
+> (see `docs/architecture/DEPLOYMENT_TOPOLOGY.md`).
 
 ---
 
@@ -10,23 +29,23 @@
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `SECRET_KEY` | **Yes (prod)** | `development-only-secret-key` (dev only) | JWT signing key. Must be a long random string in production. Boot refuses to issue tokens if absent in prod. |
-| `ENVIRONMENT` | No | `development` | Affects CORS, debug output, HSTS header, and error responses. Set `production` on Box 3. |
-| `DEBUG` | No | `false` | Enables full tracebacks in error responses. Never `true` in production. |
-| `IP_SALT` | **Yes** | `change-me` | Salt for IP anonymisation in rate-limit and report tracking. Must be ≥16 chars in production. |
-| `LOG_LEVEL` | No | `INFO` | Python logging level (`DEBUG`, `INFO`, `WARNING`, `ERROR`). |
+| `SECRET_KEY` (alias `JWT_SECRET_KEY`) | **Yes (non-dev)** | dev/test only: `development-only-secret-key` | JWT signing key. Outside development/testing, startup fails without it (`ensure_jwt_secret_configured`). |
+| `ENVIRONMENT` | No | `development` | Gates HSTS, secure cookies, the dev secret fallback, and the reCAPTCHA dev bypass. UAT should set `uat`. **Not yet upserted by the deploy workflow.** |
+| `DEBUG` | No | `false` | Dev-mode detection. Never `true` in production. |
+| `IP_SALT` | **Yes** | unset | Salt for hashing reporter IPs and payer MSISDNs before storage/logging. |
+| `LOG_LEVEL` | No | `INFO` | Python logging level. |
 
 ---
 
-## Database
+## Database & Redis
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `DATABASE_URL` | **Yes** | `postgresql://postgres:postgres@localhost:5432/employed` | SQLAlchemy DSN. Use `postgresql://` (sync driver auto-upgraded to asyncpg at runtime). |
-| `POSTGRES_USER` | Yes (compose) | — | PostgreSQL user — consumed by the `postgres` service in compose. |
-| `POSTGRES_PASSWORD` | Yes (compose) | — | PostgreSQL password. |
-| `POSTGRES_DB` | Yes (compose) | — | PostgreSQL database name. |
-| `REDIS_URL` | No | — | Redis DSN (`redis://redis:6379/0`). Required for arq job queue and session caching. |
+| `DATABASE_URL` | **Yes** | `postgresql+psycopg2://postgres:postgres@localhost:5432/employed` | Sync SQLAlchemy DSN; the async variant is derived automatically (`postgresql+asyncpg://`). |
+| `ALEMBIC_DATABASE_URL` | No | falls back to `DATABASE_URL` | Migration-specific DSN override. |
+| `DATABASE_POOL_SIZE` / `DATABASE_MAX_OVERFLOW` / `DATABASE_POOL_TIMEOUT` / `DATABASE_POOL_RECYCLE` | No | 5 / 10 / 30 / 1800 | Engine pool tuning. |
+| `POSTGRES_USER` / `POSTGRES_PASSWORD` / `POSTGRES_DB` | Yes (compose) | — | Consumed by the `postgres` compose service only. |
+| `REDIS_URL` | No | unset | Redis DSN (`redis://redis:6379/0`). Used for the arq job queue, rate limiting, login lockout, refresh-JTI revocation, webhook replay dedupe, and the `/health` component check. Without it those features degrade to in-process fallbacks. |
 
 ---
 
@@ -36,7 +55,27 @@
 |----------|----------|---------|-------------|
 | `JWT_ALGORITHM` | No | `HS256` | HMAC algorithm for JWT signing. |
 | `ACCESS_TOKEN_EXPIRE_MINUTES` | No | `30` | Access token TTL in minutes. |
-| `REFRESH_TOKEN_EXPIRE_DAYS` | No | `7` | Refresh token TTL in days. |
+| `REFRESH_TOKEN_EXPIRE_DAYS` | No | `7` | Refresh token TTL in days (also the refresh-cookie Max-Age). |
+
+---
+
+## Network trust & abuse protection
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `TRUSTED_PROXY_IPS` | No | loopback + RFC1918 CIDRs | Comma-separated IPs/CIDRs whose `X-Forwarded-For` is trusted for client-IP resolution (rate limiting / lockout). |
+| `CORS_ORIGINS` (alias `BACKEND_CORS_ORIGINS`) | **Yes outside dev** | `*` in development, empty otherwise | Exact frontend origins. Credentialed (cookie) auth cannot use the wildcard — must be set per deployed env. |
+
+---
+
+## reCAPTCHA v3 (anonymous job posting)
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `RECAPTCHA_SECRET_KEY` (fallback name `RECAPTCHA_V3_SECRET_KEY`) | Yes for anonymous posting | unset | Server-side verify secret. **If absent, anonymous submissions are rejected** (they are not waved through). |
+| `RECAPTCHA_MIN_SCORE` | No | `0.5` | Minimum acceptable score. Expected action: `submit_job`. |
+| `RECAPTCHA_BYPASS_IN_DEVELOPMENT` | No | `false` | Honored only when `ENVIRONMENT` is development/testing. |
+| `NEXT_PUBLIC_RECAPTCHA_SITE_KEY` | No | unset | Client site key. Served at **runtime** via `window.__ENV`; build-arg is a fallback only. Widget is skipped when absent. |
 
 ---
 
@@ -53,8 +92,9 @@ Sender is `noreply@xibodev.com` (domain verified in Resend).
 | `SMTP_PASSWORD` | No | — | SMTP auth password. For Resend, this is the API key (`re_...`). |
 | `SMTP_USE_SSL` | No | `false` | Use SSL (SMTP_SSL). Set `true` for port 465. |
 | `SMTP_USE_TLS` | No | `false` | Use STARTTLS. Set `true` for port 587. Mutually exclusive with SSL. |
-| `FROM_EMAIL` | No | — | Sender address displayed in outgoing mail (e.g., `Employed <noreply@xibodev.com>`). Required alongside `SMTP_HOST` for email to send. |
-| `ADMIN_EMAIL` | No | `admin@employed.co.mz` | Recipient for admin notifications. |
+| `FROM_EMAIL` | No | — | Sender address (e.g., `Employed <noreply@xibodev.com>`). Required alongside `SMTP_HOST` for email to send. |
+| `ADMIN_EMAIL` | No | — | Recipient for admin notifications (deploy env value: `admin@employed.co.mz`). |
+| `FRONTEND_BASE_URL` (fallback `APP_BASE_URL`, then request base URL) | **Yes in deployed envs** | unset | Base for transactional-email links: `/verify-email/{token}` and `/reset-password/{token}` must land on the **frontend**. Without it the backend falls back to the request (API) host — the wrong surface. |
 
 ---
 
@@ -64,58 +104,38 @@ Sender is `noreply@xibodev.com` (domain verified in Resend).
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `STRIPE_SECRET_KEY` | Prod: Yes | `sk_test_...` | Stripe secret key. Test mode: `sk_test_...`, live: `sk_live_...`. |
-| `STRIPE_WEBHOOK_SECRET` | Prod: Yes | `whsec_...` | Stripe webhook signing secret. Each webhook endpoint in the dashboard has its own secret. |
-| `STRIPE_PUBLISHABLE_KEY` | No | `pk_test_...` | Stripe publishable key. Baked into frontend at build time via `NEXT_PUBLIC_*`. |
+| `STRIPE_SECRET_KEY` | Prod: Yes | unset | Stripe secret key (`sk_test_...` / `sk_live_...`). |
+| `STRIPE_WEBHOOK_SECRET` | Prod: Yes | unset | Webhook signing secret for `POST /webhooks/_stripe/webhook`. |
+| `STRIPE_PUBLISHABLE_KEY` | No | unset | Publishable key, passed through to the client at runtime. |
 
-### M-Pesa (Vodacom Mozambique)
-
-| Variable | Required | Default | Description |
-|----------|----------|---------|-------------|
-| `MPESA_WEBHOOK_SECRET` | Live: Yes | — | HMAC secret for verifying M-Pesa callback signatures. If absent, callbacks are rejected. |
-
-### e-Mola (Movitel Mozambique)
+### M-Pesa (Vodacom Mozambique) / e-Mola (Movitel Mozambique)
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `EMOLA_WEBHOOK_SECRET` | Live: Yes | — | HMAC secret for verifying e-Mola callback signatures. |
+| `MPESA_SIMULATOR` / `EMOLA_SIMULATOR` | No | `true` | Adapter mode. The live adapter path is not implemented yet. |
+| `MPESA_WEBHOOK_SECRET` / `EMOLA_WEBHOOK_SECRET` | Live: Yes | unset | HMAC secret for verifying callbacks. If absent, callbacks are rejected. |
 
 ---
 
-## OAuth Providers
+## OAuth providers
 
-All OAuth providers are optional. If `GOOGLE_CLIENT_ID` is absent, Google OAuth returns a 501. Other providers follow the same pattern.
-
-| Variable | Provider |
-|----------|----------|
-| `GOOGLE_CLIENT_ID` | Google OAuth 2.0 |
-| `GOOGLE_CLIENT_SECRET` | Google OAuth 2.0 |
-| `FACEBOOK_CLIENT_ID` | Facebook Login |
-| `FACEBOOK_CLIENT_SECRET` | Facebook Login |
-| `GITHUB_CLIENT_ID` | GitHub OAuth |
-| `GITHUB_CLIENT_SECRET` | GitHub OAuth |
-| `TWITTER_CLIENT_ID` | Twitter/X OAuth |
-| `TWITTER_CLIENT_SECRET` | Twitter/X OAuth |
+| Variable | Provider | Status |
+|----------|----------|--------|
+| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Google OAuth 2.0 | Configured (only provider wired) |
+| `FACEBOOK_CLIENT_ID` / `FACEBOOK_CLIENT_SECRET` | Facebook Login | Placeholder names only — not wired |
+| `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` | GitHub OAuth | Placeholder names only — not wired |
+| `TWITTER_CLIENT_ID` / `TWITTER_CLIENT_SECRET` | Twitter/X OAuth | Placeholder names only — not wired |
 
 ---
 
-## reCAPTCHA v3
+## Frontend
 
-| Variable | Required | Default | Description |
-|----------|----------|---------|-------------|
-| `RECAPTCHA_SECRET_KEY` | No | — | Server-side reCAPTCHA v3 secret. If absent, score verification is skipped and submissions pass without bot protection. |
-| `NEXT_PUBLIC_RECAPTCHA_SITE_KEY` | No | — | Client-side site key. **Must be baked in at Docker build time** via `--build-arg`. If absent, the frontend skips the reCAPTCHA widget. |
-
----
-
-## Frontend build args
-
-These are baked into the Next.js Docker image at build time (not runtime). They must be passed as `--build-arg` to `docker build` and declared as `ARG` in the Dockerfile.
-
-| Build arg | Effect |
-|-----------|--------|
-| `NEXT_PUBLIC_API_URL` | Backend API base URL seen by the browser (e.g., `https://api.employed.xibodev.com`). |
-| `NEXT_PUBLIC_RECAPTCHA_SITE_KEY` | reCAPTCHA site key used by the reCAPTCHA widget. |
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `NEXT_PUBLIC_API_URL` | `http://localhost:8000` | API base URL seen by the browser. **Runtime** via `window.__ENV` (build-arg fallback only); SSR rewrites localhost → `http://backend:8000`. |
+| `NEXT_PUBLIC_APP_URL` | `http://localhost:3000` | Single source for the deployment domain (Rule 2): market hosts, `robots.txt`, and `sitemap.xml` all derive from it. Never hardcode domains in `src/`. |
+| `NEXT_PUBLIC_SIGN_IN_URL` / `NEXT_PUBLIC_SIGN_UP_URL` | `/sign-in`, `/sign-up` | Auth route overrides. |
+| `PORT` / `HOSTNAME` | `3000` / `0.0.0.0` | Standalone server binding (image env). |
 
 ---
 
@@ -123,5 +143,7 @@ These are baked into the Next.js Docker image at build time (not runtime). They 
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `SENTRY_DSN` | No | — | Sentry DSN for error reporting. If absent, error reporter is a no-op. |
-| `SENTRY_ENVIRONMENT` | No | — | Sentry environment tag (e.g., `uat`, `production`). |
+| `SENTRY_DSN` | No | — | Backend + frontend server/edge DSN. No-op when unset. **No Sentry project is provisioned yet** (operator TODO). |
+| `NEXT_PUBLIC_SENTRY_DSN` | No | — | Browser DSN (build-time embedded — not part of `window.__ENV`). |
+| `SENTRY_ENVIRONMENT` / `NEXT_PUBLIC_SENTRY_ENVIRONMENT` | No | `uat` (when DSN set) | Sentry environment tag. |
+| `SENTRY_TRACES_SAMPLE_RATE` | No | `0.1` | Tracing sample rate. |

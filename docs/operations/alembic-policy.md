@@ -1,3 +1,9 @@
+---
+last_verified: 2026-06-11T02:02:49Z
+git_ref: fix/quality-run-2026-06-10 (uat baseline 00aa899)
+verified_by: doc-drift audit, quality run 2026-06-10_120309 (ruff exclude confirmed in backend/pyproject.toml)
+---
+
 # Alembic Migration Immutability Policy
 
 > P-NEW-005 — once-applied Alembic migrations must NEVER be reformatted in

@@ -1,22 +1,40 @@
+---
+last_verified: 2026-06-11T02:02:49Z
+git_ref: fix/quality-run-2026-06-10 (uat baseline 00aa899)
+verified_by: doc-drift audit, quality run 2026-06-10_120309
+---
+
 # API Reference
 
-> FastAPI backend — `https://api.employed.xibodev.com` (UAT)
+> FastAPI backend. Current UAT base URL: `https://api.employed.xibodev.com`
+> (the deployment domain is env-derived — `NEXT_PUBLIC_API_URL` — never
+> hardcoded). Interactive docs at `/docs` (Swagger UI) and `/redoc`.
 >
-> Interactive docs available at `/docs` (Swagger UI) and `/redoc`.
-> All authenticated endpoints require `Authorization: Bearer <access_token>`.
+> Authenticated endpoints require `Authorization: Bearer <access_token>`.
+> Every response carries `X-Request-ID` and `X-Market` headers. Request
+> bodies are capped at 1 MiB (413 beyond). Rate limits are per client IP
+> (Redis fixed-window; in-process fallback without Redis).
+>
+> Canonical route table: `docs/architecture/API_MAP.md`.
+
+> **Live-UAT divergence:** this reference describes the code on branch
+> `fix/quality-run-2026-06-10` (unmerged). The deployed UAT (`uat` @
+> `00aa899`) differs in known-broken ways until the branch ships: email
+> verification/reset links point at the API host (405 on click), anonymous
+> job posting always fails reCAPTCHA, malformed verify/reset tokens return
+> 500 instead of 400, `/admin/reports` 500s when reports exist, the refresh
+> token is not set as an httpOnly cookie, and `X-Forwarded-Host` is ignored
+> for market resolution. See `docs/product/RELEASE_NOTES.md`.
 
 ---
 
 ## Health
 
-### `GET /health`
+### `GET /health` (also `HEAD`)
 
-Liveness and readiness probe. Used by the deploy pipeline smoke test and UptimeRobot.
-
-| Aspect | Detail |
-|--------|--------|
-| Auth | None |
-| Rate limit | None |
+Liveness/readiness probe with DB + Redis component checks (2 s timeout each).
+Used by the deploy pipeline smoke test and UptimeRobot. No auth, no rate
+limit, excluded from the OpenAPI schema.
 
 **Response `200`:**
 
@@ -32,17 +50,12 @@ Liveness and readiness probe. Used by the deploy pipeline smoke test and UptimeR
 
 ---
 
-## Public API
+## Public API — `/api`
 
 ### `GET /api/jobs`
 
-Market-scoped active job listings. Market is resolved from the `Host` header subdomain.
-
-| Aspect | Detail |
-|--------|--------|
-| Auth | None |
-| Rate limit | 60 req/min/IP |
-| Market scoped | Yes |
+Market-scoped active job listings. Market is resolved from the
+`X-Forwarded-Host`/`Host` header subdomain. Rate limit 60 req/min/IP.
 
 **Query parameters:**
 
@@ -50,287 +63,268 @@ Market-scoped active job listings. Market is resolved from the `Host` header sub
 |-------|------|---------|-----|-------------|
 | `page` | int | `1` | — | Page number (1-indexed) |
 | `page_size` | int | `20` | `100` | Results per page |
-| `query` | string | — | — | Full-text search on title/company |
+| `query` | string | — | — | Search on title/company |
 | `jobtype` | string | — | — | Filter by job type (e.g., `Full Time`) |
 | `remote` | bool | — | — | Filter by remote flag |
 
-**Response `200`:**
+**Response `200`:** `{ "items": [JobRead...], "total": n, "page": 1, "page_size": 20 }`
+(`site_url` on each item derives from the env-configured app URL).
 
-```json
-{
-  "items": [
-    {
-      "id": "string",
-      "slug": "string",
-      "title": "string",
-      "company": "string",
-      "country": "string",
-      "location": "string",
-      "url": "string",
-      "job_type": "string",
-      "description": "string (sanitised HTML)",
-      "status": "active",
-      "featured": false,
-      "featured_through": null,
-      "created_at": "ISO-8601",
-      "site_url": "https://employed.xibodev.com/jobs/<id>/<slug>"
-    }
-  ],
-  "total": 42,
-  "page": 1,
-  "page_size": 20
-}
-```
-
-Contact fields (`contact`) are stripped from public responses.
+The `contact` field is **excluded** from public responses.
 
 ### `GET /api/featuredJobs`
 
-Currently featured listings for the current market. Returns up to 3.
-
-| Aspect | Detail |
-|--------|--------|
-| Auth | None |
-| Rate limit | 60 req/min/IP |
-| Market scoped | Yes |
-
-Response shape: same as individual `JobRead` objects from `/api/jobs`.
+First 3 currently-featured listings for the current market. Rate limit
+60 req/min/IP. Contact excluded.
 
 ---
 
-## Auth
+## Auth — `/auth`
 
-### `POST /auth/register`
-
-Create a new account.
+### `POST /auth/register` — rate limit 5/60 s
 
 **Body:** `{ "email": "...", "password": "..." }`
 
-**Response `201`:** `TokenResponse` — access + refresh tokens.
+Always returns the neutral "check your email" response (no account
+enumeration). Sends a verification email whose link targets the **frontend**:
+`{FRONTEND_BASE_URL}/verify-email/{token}`.
 
-### `POST /auth/login`
+### `POST /auth/login` — rate limit 10/60 s
 
-Authenticate with email and password.
+**Body:** `{ "email": "...", "password": "..." }` → `TokenResponse`.
 
-**Body:** `{ "email": "...", "password": "..." }`
+**Lockout:** 5 failed attempts within 15 minutes → 15-minute lockout, keyed
+by (email, client IP) in Redis (in-process fallback without Redis).
 
-**Response `200`:** `TokenResponse`
-
-**Lockout:** 5 failed attempts within 15 minutes → 15-minute lockout.
+Browsers additionally receive the refresh token as an httpOnly cookie
+`employed_refresh_token` (path `/auth`, SameSite=Lax, Secure outside dev).
 
 ### `POST /auth/refresh`
 
-Exchange a refresh token for a new access/refresh pair.
-
-**Body:** `{ "refresh_token": "..." }`
-
-**Response `200`:** `TokenResponse`
+Refresh token from the body (non-browser clients) **or** the httpOnly cookie.
+Checks Redis JTI revocation and `password_changed_at`; rotates the cookie.
 
 ### `POST /auth/logout`
 
-Revoke the current refresh token.
+Revokes the refresh JTI (body or cookie); always clears the cookie; returns
+200 even with a garbage body.
 
-**Auth:** Bearer token required.
+### `POST /auth/verify-email/{token}`
 
-### `GET /auth/verify-email`
+Token in the **path** (not a query param). Malformed/garbage token → `400`.
 
-Confirm email address via a token sent to the user's inbox.
+### `POST /auth/forgot-password` — rate limit 3/60 s
 
-**Query param:** `token=<verification_token>`
+**Body:** `{ "email": "..." }` — neutral response; sends a frontend link
+`{FRONTEND_BASE_URL}/reset-password/{token}`.
 
-### `POST /auth/forgot-password`
+### `POST /auth/reset-password/{token}` — rate limit 5/60 s
 
-Request a password-reset email.
+**Body:** `{ "new_password": "..." }` with the token in the path. Malformed
+token → `400`. Bumps `password_changed_at` (invalidates older refresh tokens).
 
-**Body:** `{ "email": "..." }`
+### `GET /auth/oauth/{provider}`
 
-### `POST /auth/reset-password`
-
-Set a new password using a reset token.
-
-**Body:** `{ "token": "...", "new_password": "..." }`
-
-### `GET /auth/me`
-
-Return the current user's profile.
-
-**Auth:** Bearer token required.
-
-**Response `200`:** `UserRead`
-
-### `GET /auth/token-status`
-
-Check whether the current access token is valid.
-
-**Auth:** Bearer token required.
-
-### `GET /auth/oauth/{provider}/redirect`
-
-Initiate OAuth login. Redirects to the provider's consent page.
-
-Supported providers: `google` (others return `501` until configured).
+307 redirect to the provider consent page. Only `google` is configured.
 
 ### `GET /auth/oauth/{provider}/callback`
 
-OAuth callback. Exchanges the authorization code, issues tokens, and redirects to the frontend.
+Exchanges the code and issues tokens. Linking to an existing account by
+email requires the provider's verified-email claim; unverified → `403`.
 
 **Redirect URI for Google UAT:**
 `https://api.employed.xibodev.com/auth/oauth/google/callback`
 
 ---
 
-## Jobs
+## Jobs — `/jobs`
 
-All job mutation endpoints require a verified email address.
+Market-scoped via `MarketMiddleware` (`X-Forwarded-Host` → `Host`).
 
 ### `GET /jobs`
 
-Authenticated job listing (includes drafts owned by the current user).
+Public. Active jobs in the market country. Same params as `/api/jobs`;
+search/filter/count/order/pagination run in SQL.
 
-**Auth:** Bearer token required.
+### `GET /jobs/featured`
 
-### `POST /jobs`
-
-Create a new job listing.
-
-**Auth:** Bearer token + verified email required.
-
-**Body:** `JobCreate` schema. `country` is force-set to the current market — client-supplied value is ignored.
-
-**Response `201`:** `JobRead`
-
-### `GET /jobs/{job_id}`
-
-Fetch a single job by ID.
-
-### `PUT /jobs/{job_id}`
-
-Update a job owned by the current user.
-
-**Auth:** Bearer token + owner required.
-
-### `DELETE /jobs/{job_id}`
-
-Delete a job owned by the current user.
+Public. Up to 3 random featured (`featured_through ≥ now`) active market jobs.
 
 ### `GET /jobs/count`
 
-Return the count of active listings for the current market.
+Public. Same filters as the list, returns the total only.
+
+### `GET /jobs/mine`
+
+**Auth:** Bearer. Caller's jobs, any status.
+
+### `GET /jobs/{job_id}`
+
+Optional auth. 404 outside the current market (unless admin); non-active
+listings are visible only to the owner or an admin.
+
+### `POST /jobs` → `201 JobRead`
+
+Optional auth. **Anonymous:** requires a reCAPTCHA v3 token (action
+`submit_job`, score ≥ `RECAPTCHA_MIN_SCORE`). **Authenticated:** requires a
+verified email. `country` is force-set from the current market — any
+client-supplied value is ignored. Owner receives a submission email.
+
+### `PUT /jobs/{job_id}`
+
+**Auth:** Bearer + verified email; owner or admin. An owner edit of an
+`active` job resets it to `pending` (with a status-history entry).
+
+### `DELETE /jobs/{job_id}` → `204`
+
+**Auth:** Bearer; owner or admin.
+
+### `POST /jobs/{job_id}/deactivate?filled=`
+
+**Auth:** Bearer; owner or admin. `active` → `filled`/`inactive`; the owner
+is notified by email when an admin deactivates.
 
 ---
 
-## Payments
+## Payments — `/payments`
 
 ### `GET /payments/providers`
 
-List payment providers available for the current market.
+Public. Providers + featured price for the active market (MZ: mpesa, emola,
+stripe; MX: stripe).
 
-### `POST /payments/initiate`
+### `POST /payments/initiate` → `201 PaymentInitiateResponse`
 
-Create a payment intent for featuring a job.
+**Auth:** Bearer + verified email; job must belong to the caller and be
+`pending` or `active`; provider must be in the market's list. An existing
+open intent for the same job is returned instead of creating a duplicate.
 
-**Auth:** Bearer token + verified email + job owner required.
+**Body:** `{ "job_id": "...", "provider_key": "stripe"|"mpesa"|"emola", "payer_msisdn": "..." (mobile money) }`
 
-**Body:** `{ "job_id": "...", "provider_key": "stripe" | "mpesa" | "emola" }`
+Response: `{ intent_id, provider_key, status, kind, redirect_url?, provider_ref? }` —
+Stripe returns a `redirect_url` to Checkout; mobile money returns status
+`awaiting_user`.
 
-**Response `200`:** `PaymentInitiateResponse`
+### `GET /payments/{intent_id}/status`
 
-For Stripe: includes a `redirect_url` pointing to Stripe Checkout.
-For mobile money: includes a `status` of `awaiting_user`.
+**Auth:** Bearer; intent owner. Polled by the frontend `PaymentPoller`.
 
-### `GET /payments/status/{intent_id}`
+### `POST /payments/{intent_id}/cancel`
 
-Fetch the current status of a payment intent.
-
-**Auth:** Bearer token + intent owner required.
-
-### `POST /payments/cancel/{intent_id}`
-
-Cancel a pending payment intent. Idempotent — calling on a terminal intent is a no-op.
+**Auth:** Bearer; intent owner. Non-terminal intents only.
 
 ---
 
-## Webhook Endpoints
+## Reports — `/reports`
 
-### `POST /_stripe/webhook`
+### `POST /reports` → `201 ReportRead`
 
-Stripe payment lifecycle events.
+Optional auth. Reasons: `spam`, `scam`, `discriminatory`, `wrong_country`,
+`expired_or_filled`, `duplicate`. Anonymous reporters are stored as a salted
+IP hash.
 
-| Aspect | Detail |
-|--------|--------|
-| Auth | `Stripe-Signature` header verified against `STRIPE_WEBHOOK_SECRET` |
-| Body | Raw bytes (must not be pre-parsed) |
+### `PATCH /reports/{report_id}/resolve`
 
-**Handled events:** `checkout.session.completed`, `checkout.session.async_payment_succeeded`, `checkout.session.async_payment_failed`, `charge.refunded`, `charge.dispute.created`
-
-All handling is idempotent via a replay cache.
-
-### `POST /_mpesa/callback`
-
-M-Pesa payment callback (Vodacom Mozambique).
-
-| Aspect | Detail |
-|--------|--------|
-| Auth | HMAC-SHA256 via `x-mpesa-signature` or `x-callback-signature` header |
-| Secret | `MPESA_WEBHOOK_SECRET` |
-
-### `POST /_emola/callback`
-
-e-Mola payment callback (Movitel Mozambique).
-
-| Aspect | Detail |
-|--------|--------|
-| Auth | HMAC-SHA256 via `x-emola-signature` or `x-callback-signature` header |
-| Secret | `EMOLA_WEBHOOK_SECRET` |
+**Auth:** admin. Resolutions: `reviewed`, `dismissed`, `job_removed`.
 
 ---
 
-## Admin
+## Webhooks — mounted under `/webhooks`
 
-All admin endpoints require the `admin` role.
+> The router is mounted with the `/webhooks` prefix — the bare
+> `/_stripe/webhook` path **404s**. Provider dashboards must use the full
+> paths below. Excluded from the OpenAPI schema.
 
-### `GET /admin/jobs`
+### `POST /webhooks/_stripe/webhook`
 
-List all jobs regardless of status.
+`Stripe-Signature` verified against `STRIPE_WEBHOOK_SECRET`; body must be raw
+bytes. **Handled events:** `checkout.session.completed`,
+`checkout.session.async_payment_succeeded`,
+`checkout.session.async_payment_failed`, `charge.refunded`,
+`charge.dispute.created`. Idempotent via a replay cache.
 
-### `PUT /admin/jobs/{job_id}/status`
+### `POST /webhooks/_mpesa/callback`
 
-Update a job's status (`pending` → `active` → `filled` / `inactive`).
+HMAC-SHA256 via `x-mpesa-signature` or `x-callback-signature` header, secret
+`MPESA_WEBHOOK_SECRET`. The payload **must** include a timestamp within
+5 minutes (missing/old → `400`); deliveries are replay-deduped.
 
-### `GET /admin/users`
+### `POST /webhooks/_emola/callback`
 
-List all users.
-
-### `PUT /admin/users/{user_id}/roles`
-
-Assign or revoke roles on a user.
-
----
-
-## Profiles
-
-### `GET /profiles/{username}`
-
-Public talent profile.
-
-### `POST /profiles`
-
-Create or update the current user's talent profile.
-
-**Auth:** Bearer token required.
+Same contract as M-Pesa with `x-emola-signature` and `EMOLA_WEBHOOK_SECRET`.
 
 ---
 
-## Users
+## Admin — `/admin` (all require the `admin` role)
+
+### `GET /admin/jobs?status=&page=&page_size=`
+
+All markets, any status; `page_size` ≤ 200.
+
+### `PATCH /admin/jobs/{job_id}/status`
+
+Set status (`pending`/`active`/`flagged`/`inactive`/`filled`); appends to
+`status_history`.
+
+### `PATCH /admin/jobs/bulk-status`
+
+Bulk variant of the above.
+
+### `GET /admin/users?q=`
+
+Without `q`: admins only. With `q` (2–120 chars): searches **all** users by
+email/name (so non-admins can be found and promoted).
+
+### `POST /admin/users/{user_id}/roles/{role}` / `DELETE .../roles/{role}`
+
+Grant/revoke a role; only `admin` is accepted.
+
+### `GET /admin/reports?resolution=`
+
+Up to 200 reports.
+
+---
+
+## Profiles — `/profiles`
+
+### `GET /profiles/{user_id}`
+
+Public talent profile (keyed by user id, not username).
+
+### `POST /profiles` → `201` / `PUT /profiles`
+
+**Auth:** Bearer. Upsert / update the caller's own profile.
+
+---
+
+## Users — `/users`
 
 ### `GET /users/me`
 
-Current user account data.
+Current user. Returns snake_case fields (e.g. `email_verified`).
 
-### `PUT /users/me`
+### `GET /users/me/export` — rate limit 5/hour
 
-Update display name, preferences.
+Data export: user + jobs + profile + payment intents + reports.
 
-### `DELETE /users/me`
+### `POST /users/me/resend-verification`
 
-Request account deletion (queued, not immediate).
+Resend the verification email.
+
+### `POST /users/me/request-deletion`
+
+Schedules account deletion at now + 30 days (worker cron hard-deletes).
+
+### `POST /users/me/cancel-deletion`
+
+Cancels a pending deletion request.
+
+---
+
+## Frontend-local endpoint
+
+### `GET /api/health` (frontend origin)
+
+`frontend/src/app/api/health/route.ts` — static
+`{ "status": "ok", "service": "employed-frontend" }`; container healthcheck
+target.

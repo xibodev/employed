@@ -1,5 +1,9 @@
 # Meteor 3 upgrade — package audit
 
+> **OBSOLETE (2026-06-10):** the Meteor stack was retired by the May 2026
+> rewrite to FastAPI + Next.js (`MIGRATION-PLAN.md`); the Meteor 3 upgrade
+> will never happen. Kept as historical reference only.
+
 > Triage table for `upgrade/meteor-3` branch (B24). Inputs: `.meteor/packages`,
 > `package.json`, and a survey of upstream maintenance status as of
 > May 2026. **Do not** start the upgrade until every ❌ has a confirmed

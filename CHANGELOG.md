@@ -5,11 +5,35 @@ All notable changes to **Employed** are recorded here.
 This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 formatting and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed (FastAPI + Next.js era — current stack)
+
+- **Quality-run fix release `employed-uat-2026-06-10`** — 28 fixes on branch
+  `fix/quality-run-2026-06-10` (security, market resolution, email links,
+  reCAPTCHA, admin moderation, localization, runtime config, +51 regression
+  tests → 134 backend tests). **Not yet merged or deployed** — live UAT still
+  runs the pre-fix `uat` @ `00aa899` build. Canonical detail:
+  `docs/product/RELEASE_NOTES.md` (incl. pre-deploy gates) and
+  `docs/product/FEATURE_REGISTRY.md`.
+- **Docs drift sweep (2026-06-10)** — corrected stale Meteor-era and
+  pre-fix claims across `README.md`, `CLAUDE.md`, `DEPLOY.md`, `PITCH.md`,
+  `docs/api-reference.md`, `docs/payment-flows.md`, `docs/settings-reference.md`,
+  `docs/markets-and-locales.md`, operations docs, and env examples.
+
+---
+
+## Historical — Meteor era (pre-May-2026 rewrite)
+
+> Everything below this line predates the May 2026 rewrite to FastAPI +
+> Next.js (`MIGRATION-PLAN.md`). File paths such as `server/*.js`,
+> `client/views/*`, and `both/collections/*` refer to the retired Meteor
+> codebase and no longer exist in this repo. Kept as the audit trail for
+> the 1.x line.
+
 The list is backfilled from `FIXES_PLAN.md` Tiers 1–9. Each tier shipped as a
 multi-PR effort; individual ticket IDs (B*, T*, A9.*) are listed inline so
 on-call can trace any single behaviour back to its rationale.
-
-## [Unreleased]
 
 ### Added
 

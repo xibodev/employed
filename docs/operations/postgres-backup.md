@@ -1,12 +1,22 @@
+---
+last_verified: 2026-06-11T02:02:49Z
+git_ref: fix/quality-run-2026-06-10 (uat baseline 00aa899)
+verified_by: doc-drift audit, quality run 2026-06-10_120309
+---
+
 # PostgreSQL Backup & Restore Procedure
 
 > docs/operations/postgres-backup.md — P-013
+>
+> **Status: requires-verification.** Target procedure; the cron and off-site
+> sync are not confirmed configured on Box 3. See also `docs/backup-strategy.md`.
 
 ---
 
 ## Overview
 
-Employed uses a single PostgreSQL instance (`employed_db`) hosted on the production server.
+Employed uses a single PostgreSQL instance (compose service `postgres`,
+container `employed-postgres-1` on Box 3) in the product compose stack.
 Backups are taken with `pg_dump` and stored in object storage (S3-compatible).
 
 ---
@@ -25,7 +35,7 @@ Backups are taken with `pg_dump` and stored in object storage (S3-compatible).
 
 ```bash
 # Run inside the db container (or on the host with DB access)
-docker exec employed-db \
+docker exec employed-postgres-1 \
   pg_dump -U "${POSTGRES_USER}" "${POSTGRES_DB}" \
   | gzip \
   > "/backups/employed_$(date +%Y%m%dT%H%M%S).sql.gz"
@@ -69,7 +79,7 @@ docker compose -f deploy/docker-compose.prod.yml stop backend worker
 ### 2. Create a safety snapshot of the current database
 
 ```bash
-docker exec employed-db \
+docker exec employed-postgres-1 \
   pg_dump -U "${POSTGRES_USER}" "${POSTGRES_DB}" \
   | gzip > "/backups/pre-restore-safety-$(date +%Y%m%dT%H%M%S).sql.gz"
 ```
@@ -78,19 +88,19 @@ docker exec employed-db \
 
 ```bash
 # Drop and recreate the target database
-docker exec -i employed-db psql -U "${POSTGRES_USER}" -c \
+docker exec -i employed-postgres-1 psql -U "${POSTGRES_USER}" -c \
   "DROP DATABASE IF EXISTS \"${POSTGRES_DB}\"; CREATE DATABASE \"${POSTGRES_DB}\";"
 
 # Restore
 zcat /backups/employed_<TIMESTAMP>.sql.gz \
-  | docker exec -i employed-db \
+  | docker exec -i employed-postgres-1 \
     psql -U "${POSTGRES_USER}" -d "${POSTGRES_DB}"
 ```
 
 ### 4. Run Alembic migrations (if restoring to an older schema version)
 
 ```bash
-docker compose -f deploy/docker-compose.prod.yml run --rm migration
+docker compose -f deploy/docker-compose.prod.yml run --rm migrate
 ```
 
 ### 5. Restart services
