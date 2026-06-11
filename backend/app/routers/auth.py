@@ -547,7 +547,13 @@ async def oauth_callback(
     else:
         profile = await exchange_code(provider, request, code, state)
     user = _find_user_by_provider(db, provider, profile.get("provider_id"))
-    if user is None and profile.get("email"):
+    # EMP-018: only link to an existing local account by email when the
+    # provider attests the email is verified — otherwise a provider account
+    # created with someone else's (unverified) address takes over the local
+    # account. Default True for google profiles lacking the claim (legacy
+    # exchange stubs); google's normalize_profile carries the real claim.
+    claim_verified = bool(profile.get("email_verified", provider == "google"))
+    if user is None and profile.get("email") and claim_verified:
         user = _find_user_by_email(db, profile["email"])
     if user is None:
         user = _user_model()()

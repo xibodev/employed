@@ -150,6 +150,9 @@ def normalize_profile(provider: str, profile: dict) -> dict:
             "provider": provider,
             "provider_id": profile.get("sub"),
             "email": profile.get("email"),
+            # EMP-018: carried through so the callback can require a verified
+            # email before account linking.
+            "email_verified": bool(profile.get("email_verified", False)),
             "name": profile.get("name"),
             "avatar_url": profile.get("picture"),
         }
@@ -159,6 +162,8 @@ def normalize_profile(provider: str, profile: dict) -> dict:
             "provider": provider,
             "provider_id": profile.get("id"),
             "email": profile.get("email"),
+            # Facebook only exposes verified emails via the Graph API.
+            "email_verified": bool(profile.get("email")),
             "name": profile.get("name"),
             "avatar_url": picture,
         }
@@ -167,6 +172,8 @@ def normalize_profile(provider: str, profile: dict) -> dict:
             "provider": provider,
             "provider_id": str(profile.get("id")) if profile.get("id") is not None else None,
             "email": profile.get("email"),
+            # GitHub profile emails are not verified-attested on /user.
+            "email_verified": False,
             "name": profile.get("name") or profile.get("login"),
             "avatar_url": profile.get("avatar_url"),
         }
@@ -176,6 +183,7 @@ def normalize_profile(provider: str, profile: dict) -> dict:
             "provider": provider,
             "provider_id": data.get("id"),
             "email": data.get("email"),
+            "email_verified": False,
             "name": data.get("name") or data.get("username"),
             "avatar_url": data.get("profile_image_url"),
         }

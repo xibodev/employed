@@ -387,3 +387,46 @@ def test_logout_revokes_cookie_refresh_token_and_clears_cookie(client, test_user
     # The JTI from the cookie-carried token is revoked
     refresh = client.post("/auth/refresh", json={"refresh_token": refresh_token_value})
     assert refresh.status_code == 401
+
+
+def test_oauth_links_existing_account_only_with_verified_email_claim(client, user_factory, monkeypatch):
+    """EMP-018 regression: email-based account linking requires the
+    provider's verified-email attestation."""
+    victim = user_factory(email="victim@example.com")
+
+    async def unverified_exchange(provider: str, request, code: str):
+        return {
+            "provider": "google",
+            "provider_id": "attacker-subject",
+            "email": "victim@example.com",
+            "email_verified": False,
+            "name": "Attacker",
+        }
+
+    monkeypatch.setattr("app.routers.auth.exchange_code", unverified_exchange)
+
+    response = client.get("/auth/oauth/google/callback?code=oauth-code")
+
+    assert response.status_code == 200
+    # A NEW account is created instead of taking over the victim's account
+    assert response.json()["user"]["id"] != victim.id
+
+
+def test_oauth_links_existing_account_with_verified_email_claim(client, user_factory, monkeypatch):
+    existing = user_factory(email="linked@example.com")
+
+    async def verified_exchange(provider: str, request, code: str):
+        return {
+            "provider": "google",
+            "provider_id": "google-linked-subject",
+            "email": "linked@example.com",
+            "email_verified": True,
+            "name": "Linked User",
+        }
+
+    monkeypatch.setattr("app.routers.auth.exchange_code", verified_exchange)
+
+    response = client.get("/auth/oauth/google/callback?code=oauth-code")
+
+    assert response.status_code == 200
+    assert response.json()["user"]["id"] == existing.id
