@@ -113,7 +113,8 @@ def test_mpesa_callback_with_valid_hmac_returns_200(client, monkeypatch, payment
     intent = payment_intent_factory(
         job=job, user=test_user, provider_key="mpesa", status="awaiting_user", provider_ref="ref-123"
     )
-    payload = {"provider_ref": intent.provider_ref, "status": "successful"}
+    # timestamp is mandatory since EMP-019
+    payload = {"provider_ref": intent.provider_ref, "status": "successful", "timestamp": utcnow().isoformat()}
     raw = json.dumps(payload).encode("utf-8")
     signature = hmac.new(secret.encode("utf-8"), raw, hashlib.sha256).hexdigest()
 
@@ -203,3 +204,59 @@ def test_stripe_webhook_is_mounted_under_webhooks_prefix(client):
 
     assert response.status_code != 404
     assert response.status_code in (400, 401, 403, 503)
+
+
+def test_mpesa_callback_rejects_missing_timestamp(client, monkeypatch):
+    """EMP-019 regression: payloads without a timestamp skipped staleness
+    validation entirely (unbounded replay window). Now mandatory."""
+    secret = "mpesa-secret"
+    payload = {
+        "provider_ref": "ref-notimestamp",
+        "intent_id": "intent-notimestamp",
+        "status": "successful",
+        "event_id": "mpesa-no-ts-1",
+    }
+    raw = json.dumps(payload).encode("utf-8")
+    signature = hmac.new(secret.encode("utf-8"), raw, hashlib.sha256).hexdigest()
+    monkeypatch.setattr("app.webhooks.mobile_money._setting", lambda name, default=None: secret)
+    from app.webhooks.mobile_money import PROCESSED_CALLBACK_EVENTS
+
+    PROCESSED_CALLBACK_EVENTS.clear()
+    response = client.post("/_mpesa/callback", content=raw, headers={"x-mpesa-signature": signature})
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "missing-webhook-timestamp"
+
+
+def test_replay_cache_uses_redis_when_available(monkeypatch):
+    """EMP-019: dedupe keys live in Redis (shared, restart-surviving) when
+    configured; the in-process map is only the fallback."""
+    from app.webhooks.replay_cache import ReplayCache
+
+    class FakeRedis:
+        def __init__(self):
+            self.store: dict[str, str] = {}
+            self.ttls: dict[str, int] = {}
+
+        def get(self, key):
+            return self.store.get(key)
+
+        def set(self, key, value, ex=None):
+            self.store[key] = value
+            if ex is not None:
+                self.ttls[key] = ex
+
+        def close(self):
+            pass
+
+    shared = FakeRedis()
+    monkeypatch.setattr("app.webhooks.replay_cache.redis_client", lambda: shared)
+
+    # Two separate cache instances simulate two worker processes
+    cache_a = ReplayCache(ttl_seconds=300, namespace="test-ns")
+    cache_b = ReplayCache(ttl_seconds=300, namespace="test-ns")
+
+    assert cache_a.contains("evt-1") is False
+    cache_a.add("evt-1")
+    assert cache_b.contains("evt-1") is True
+    assert shared.ttls["replay:test-ns:evt-1"] == 300

@@ -19,7 +19,11 @@ logger = logging.getLogger(__name__)
 router = APIRouter(tags=["webhooks"])
 
 CALLBACK_REPLAY_WINDOW = timedelta(minutes=5)
-PROCESSED_CALLBACK_EVENTS = ReplayCache(ttl_seconds=int(CALLBACK_REPLAY_WINDOW.total_seconds()), max_entries=10000)
+PROCESSED_CALLBACK_EVENTS = ReplayCache(
+    ttl_seconds=int(CALLBACK_REPLAY_WINDOW.total_seconds()),
+    max_entries=10000,
+    namespace="mobile-money",
+)
 TIMESTAMP_FIELDS = ("timestamp", "created_at", "createdAt", "sent_at", "sentAt")
 EVENT_ID_FIELDS = (
     "event_id",
@@ -131,7 +135,10 @@ def _extract_timestamp(payload: dict) -> tuple[str | None, datetime | None]:
 def _validate_timestamp(payload: dict) -> tuple[str | None, datetime | None]:
     field, timestamp_value = _extract_timestamp(payload)
     if timestamp_value is None:
-        return field, timestamp_value
+        # EMP-019: payloads without any timestamp previously skipped staleness
+        # validation entirely, leaving an unbounded replay window for captured
+        # signed payloads. A timestamp field is now mandatory.
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="missing-webhook-timestamp")
     if timestamp_value < utcnow() - CALLBACK_REPLAY_WINDOW:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="stale-webhook-payload")
     return field, timestamp_value

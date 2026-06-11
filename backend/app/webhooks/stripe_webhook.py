@@ -14,7 +14,7 @@ from app.webhooks.replay_cache import ReplayCache
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["webhooks"])
 
-PROCESSED_STRIPE_EVENTS = ReplayCache(ttl_seconds=86400, max_entries=10000)
+PROCESSED_STRIPE_EVENTS = ReplayCache(ttl_seconds=86400, max_entries=10000, namespace="stripe")
 
 
 def _setting(name: str, default=None):
