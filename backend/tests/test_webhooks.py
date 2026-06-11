@@ -193,3 +193,13 @@ def test_mpesa_duplicate_callback_is_ignored(client, monkeypatch):
     assert first.json()["updated"] is True
     assert second.json()["updated"] is False
     assert calls["count"] == 1
+
+
+def test_stripe_webhook_is_mounted_under_webhooks_prefix(client):
+    """EMP-014 regression: the app mounts the webhook router under
+    /webhooks, so the public path is POST /webhooks/_stripe/webhook.
+    It must exist (not 404) — unconfigured secret yields 4xx/503."""
+    response = client.post("/webhooks/_stripe/webhook", content=b"{}")
+
+    assert response.status_code != 404
+    assert response.status_code in (400, 401, 403, 503)
