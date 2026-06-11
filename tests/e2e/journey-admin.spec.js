@@ -75,11 +75,25 @@ function subjectFor(message) {
   return message?.Content?.Headers?.Subject?.[0] || message?.MIME?.Headers?.Subject?.[0] || '';
 }
 
+// TD-002: MailHog bodies are quoted-printable; soft line breaks (=CRLF)
+// wrap long JWTs across lines and the naive regex extracted a truncated
+// token (the cause of 6 soft-assert failures + the EMP-025 500s).
+function decodeQuotedPrintable(text) {
+  if (!text) {
+    return '';
+  }
+  return String(text)
+    .replace(/=\r?\n/g, '')
+    .replace(/=([0-9A-F]{2})/gi, (match, hex) => String.fromCharCode(parseInt(hex, 16)));
+}
+
 function bodyFor(message) {
   const mimeParts = Array.isArray(message?.MIME?.Parts)
-    ? message.MIME.Parts.map((part) => part?.Body || '').join('\n')
+    ? message.MIME.Parts.map((part) => decodeQuotedPrintable(part?.Body || '')).join('\n')
     : '';
-  return [message?.Content?.Body, mimeParts, message?.Raw?.Data].filter(Boolean).join('\n');
+  return [decodeQuotedPrintable(message?.Content?.Body), mimeParts, decodeQuotedPrintable(message?.Raw?.Data)]
+    .filter(Boolean)
+    .join('\n');
 }
 
 async function waitForMessage(request, predicate, timeout = 15000) {

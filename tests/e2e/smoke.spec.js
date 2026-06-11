@@ -1,5 +1,6 @@
 // @ts-check
 const { test, expect } = require('@playwright/test');
+const { anyLocaleRegex } = require('./i18n');
 
 const API_URL = process.env.API_URL || 'http://localhost:3301';
 const MAILHOG_URL = process.env.MAILHOG_URL || 'http://localhost:3310';
@@ -12,7 +13,8 @@ test.describe('Anonymous Visitor', () => {
     await expect(page).toHaveTitle(/Employed/);
     // Hero section should be visible
     const body = page.locator('body');
-    await expect(body).toContainText('Local jobs');
+    // TD-001: default market serves pt — assert catalog copy, any locale
+    await expect(body).toContainText(anyLocaleRegex('home.heroTagline'));
   });
 
   test('health endpoint returns ok', async ({ request }) => {
@@ -29,14 +31,18 @@ test.describe('Anonymous Visitor', () => {
     expect(res.ok()).toBeTruthy();
   });
 
-  test('robots.txt is currently not served', async ({ request }) => {
+  test('robots.txt is served', async ({ request }) => {
+    // TD-003: robots.txt ships now (env-derived base URL, EMP-024)
     const res = await request.get('/robots.txt');
-    expect(res.status()).toBe(404);
+    expect(res.status()).toBe(200);
+    expect(await res.text()).toContain('Sitemap:');
   });
 
-  test('sitemap.xml is currently not served', async ({ request }) => {
+  test('sitemap.xml is served', async ({ request }) => {
+    // TD-003: sitemap.xml ships now (env-derived market hosts, EMP-024)
     const res = await request.get('/sitemap.xml');
-    expect(res.status()).toBe(404);
+    expect(res.status()).toBe(200);
+    expect(await res.text()).toContain('<urlset');
   });
 
   test('jobs listing page loads', async ({ page }) => {

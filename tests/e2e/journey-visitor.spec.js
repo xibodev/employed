@@ -1,5 +1,6 @@
 // @ts-check
 const { test, expect } = require('@playwright/test');
+const { anyLocaleRegex } = require('./i18n');
 const fs = require('node:fs');
 const path = require('node:path');
 const { execFileSync } = require('node:child_process');
@@ -114,9 +115,9 @@ test('Journey 4 — Anonymous Visitor', async ({ page, request }, testInfo) => {
   await test.step('Home page loads with featured jobs section', async () => {
     await page.goto('/');
     await page.waitForLoadState('networkidle');
-    await expect(page.getByRole('navigation').getByRole('link', { name: /browse jobs/i }).first()).toBeVisible();
-    await expect(page.locator('body')).toContainText('Local jobs');
-    await expect(page.locator('body')).toContainText(/browse jobs/i);
+    await expect(page.getByRole('navigation').getByRole('link', { name: anyLocaleRegex('nav.browseJobs') }).first()).toBeVisible();
+    await expect(page.locator('body')).toContainText(anyLocaleRegex('home.heroTagline'));
+    await expect(page.locator('body')).toContainText(anyLocaleRegex('nav.browseJobs'));
     await snap(page, testInfo, 'step-1-home');
     await delay();
   });

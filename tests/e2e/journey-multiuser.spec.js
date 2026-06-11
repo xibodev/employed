@@ -1,5 +1,6 @@
 // @ts-check
 const { test, expect } = require('@playwright/test');
+const { anyLocaleRegex } = require('./i18n');
 const fs = require('node:fs');
 const path = require('node:path');
 const { execFileSync } = require('node:child_process');
@@ -124,8 +125,9 @@ test('Journey 5 — Multi-User Interaction', async ({ browser, request }, testIn
     await test.step('Carlos and Marta sign in with separate browser contexts', async () => {
       await Promise.all([carlosPage.goto('/'), martaPage.goto('/')]);
       await Promise.all([carlosPage.waitForLoadState('networkidle'), martaPage.waitForLoadState('networkidle')]);
-      await expect(carlosPage.locator('body')).toContainText(/sign out|post a job/i);
-      await expect(martaPage.locator('body')).toContainText(/sign out|post a job/i);
+      const signedInCopy = new RegExp(`${anyLocaleRegex('nav.signOut').source}|${anyLocaleRegex('nav.postJob').source}`, 'i');
+      await expect(carlosPage.locator('body')).toContainText(signedInCopy);
+      await expect(martaPage.locator('body')).toContainText(signedInCopy);
       await snap(carlosPage, testInfo, 'step-1-carlos-session');
       await snap(martaPage, testInfo, 'step-1-marta-session');
     });
