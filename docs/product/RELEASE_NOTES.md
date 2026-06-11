@@ -1,9 +1,9 @@
 # Employed — Release Notes
 
 ```yaml
-last_verified: 2026-06-11T01:44:01Z
-verified_by: backlog-feature-steward (quality run 2026-06-10_120309)
-branch: fix/quality-run-2026-06-10 @ 7f4b5b8 (uat baseline 00aa899)
+last_verified: 2026-06-11T04:50:00Z
+verified_by: fix-executor follow-up pass (quality run 2026-06-10_120309)
+branch: fix/quality-run-2026-06-10 (uat baseline 00aa899)
 ```
 
 Claims policy: anything under **UNRELEASED** cites `tested_locally` evidence
@@ -22,12 +22,13 @@ deploy-run id.
 > iteration GO.**
 >
 > **Pre-merge/pre-deploy prerequisites (hard gates):**
-> 1. **BL-001 / CARTO-002** — extend `deploy-uat.yml` env upsert with
->    `FRONTEND_BASE_URL`, `NEXT_PUBLIC_APP_URL`, `CORS_ORIGINS`, `ENVIRONMENT`,
->    `SENTRY_DSN`, `SENTRY_ENVIRONMENT`. Without it the deploy re-breaks the
->    EMP-004 email funnel, EMP-006 cookie auth (wildcard CORS), and
->    EMP-013/024 env-derived domains.
-> 2. **BL-002** — set exact per-env `CORS_ORIGINS` (operator).
+> 1. **BL-001 / CARTO-002 — RESOLVED ON BRANCH, pending merge (2026-06-11).**
+>    `deploy-uat.yml` now upserts `FRONTEND_BASE_URL`, `NEXT_PUBLIC_APP_URL`,
+>    exact-origin `CORS_ORIGINS`, `ENVIRONMENT=uat`, `SENTRY_DSN` (optional
+>    `EMPLOYED_UAT_SENTRY_DSN` secret, empty-safe) and `SENTRY_ENVIRONMENT=uat`.
+>    Takes effect on the first deploy after merge.
+> 2. **BL-002** — UAT origins covered by the BL-001 upsert; operator re-checks
+>    only for future envs with different origins.
 > 3. Push to `uat` triggers the live deploy — a human 🟡 confirm-first action.
 
 Baseline: `uat` @ `00aa899` · Local gate: ruff PASS · pytest **134/134**
@@ -125,11 +126,15 @@ re-seeded sealed Docker stack (`fix-execution/execution-report.json`).
 - New env names (names only): `FRONTEND_BASE_URL`, `RECAPTCHA_MIN_SCORE`,
   `RECAPTCHA_BYPASS_IN_DEVELOPMENT`, `TRUSTED_PROXY_IPS`, `CORS_ORIGINS`,
   `SENTRY_DSN`, `SENTRY_ENVIRONMENT` — documented in `deploy/.env.example`;
-  **not yet upserted by `deploy-uat.yml`** (BL-001).
+  the deploy-critical subset is **now upserted by `deploy-uat.yml`** (BL-001,
+  resolved on branch 2026-06-11).
 - EMP-019 webhook contract change (mandatory timestamp) takes effect on deploy.
 - Backend image dependency set changes on next build (EMP-021).
-- No `.github/workflows/*` or `deploy/docker-compose.prod.yml` files were
-  modified by the fix branch.
+- **Deploy-affecting workflow change (BL-001):** `.github/workflows/deploy-uat.yml`
+  env-upsert block extended on this branch (operator-authorized). It deploys
+  nothing by itself, but the first post-merge push to `uat` applies the new
+  env set on Box 3. `deploy/docker-compose.prod.yml` remains unmodified except
+  for the pre-existing worker-healthcheck fix.
 
 ---
 

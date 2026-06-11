@@ -1,7 +1,7 @@
 ---
-last_verified: 2026-06-11T02:02:49Z
+last_verified: 2026-06-11T04:50:00Z
 git_ref: fix/quality-run-2026-06-10 (uat baseline 00aa899)
-verified_by: doc-drift audit, quality run 2026-06-10_120309
+verified_by: fix-executor follow-up pass, quality run 2026-06-10_120309
 ---
 
 # Settings Reference
@@ -18,9 +18,10 @@ verified_by: doc-drift audit, quality run 2026-06-10_120309
 > are served per-request via `window.__ENV` (`RuntimeEnvScript`) — the Docker
 > build args remain only as fallbacks.
 >
-> **Deploy gap:** `deploy-uat.yml` does not yet upsert `FRONTEND_BASE_URL`,
-> `NEXT_PUBLIC_APP_URL`, `CORS_ORIGINS`, `ENVIRONMENT`, `SENTRY_DSN`,
-> `SENTRY_ENVIRONMENT` — required before deploying the current branch
+> **Deploy gap (BL-001): resolved on branch, pending merge (2026-06-11).**
+> `deploy-uat.yml` now upserts `FRONTEND_BASE_URL`, `NEXT_PUBLIC_APP_URL`,
+> exact-origin `CORS_ORIGINS`, `ENVIRONMENT=uat`, `SENTRY_DSN` and
+> `SENTRY_ENVIRONMENT=uat` — applied on the first post-merge deploy
 > (see `docs/architecture/DEPLOYMENT_TOPOLOGY.md`).
 
 ---
@@ -30,7 +31,7 @@ verified_by: doc-drift audit, quality run 2026-06-10_120309
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
 | `SECRET_KEY` (alias `JWT_SECRET_KEY`) | **Yes (non-dev)** | dev/test only: `development-only-secret-key` | JWT signing key. Outside development/testing, startup fails without it (`ensure_jwt_secret_configured`). |
-| `ENVIRONMENT` | No | `development` | Gates HSTS, secure cookies, the dev secret fallback, and the reCAPTCHA dev bypass. UAT should set `uat`. **Not yet upserted by the deploy workflow.** |
+| `ENVIRONMENT` | No | `development` | Gates HSTS, secure cookies, the dev secret fallback, and the reCAPTCHA dev bypass. UAT sets `uat` — upserted by the deploy workflow as of BL-001 (branch, pending merge). |
 | `DEBUG` | No | `false` | Dev-mode detection. Never `true` in production. |
 | `IP_SALT` | **Yes** | unset | Salt for hashing reporter IPs and payer MSISDNs before storage/logging. |
 | `LOG_LEVEL` | No | `INFO` | Python logging level. |

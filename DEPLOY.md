@@ -1,7 +1,7 @@
 ---
-last_verified: 2026-06-11T02:02:49Z
+last_verified: 2026-06-11T04:50:00Z
 git_ref: fix/quality-run-2026-06-10 (uat baseline 00aa899)
-verified_by: doc-drift audit, quality run 2026-06-10_120309
+verified_by: fix-executor follow-up pass, quality run 2026-06-10_120309
 ---
 
 # DEPLOY.md — employed.co.mz
@@ -41,12 +41,15 @@ verified_by: doc-drift audit, quality run 2026-06-10_120309
 `EMPLOYED_UAT_RECAPTCHA_SECRET_KEY`, `EMPLOYED_UAT_GOOGLE_CLIENT_ID`,
 `EMPLOYED_UAT_GOOGLE_CLIENT_SECRET`, `EMPLOYED_UAT_RESEND_API_KEY`.
 
+Optional: `EMPLOYED_UAT_SENTRY_DSN` (absent → empty string → backend Sentry
+no-op; provision per BL-003 and the workflow picks it up on the next deploy).
+
 Resolve values per `_integrations/CREDENTIALS.md` — never paste them anywhere.
 
 ## Required env vars
 
 - Schema reference: `deploy/.env.example` (names + dev placeholders) and `docs/architecture/CONFIG_AND_SECRETS_MAP.md` (var × consumer map). A local `.env.uat.example` mirror exists at the repo root but is gitignored.
-- **Known gap (pre-deploy gate for the fix branch)**: `deploy-uat.yml` does not yet upsert `FRONTEND_BASE_URL`, `NEXT_PUBLIC_APP_URL`, `CORS_ORIGINS`, `ENVIRONMENT`, `SENTRY_DSN`, `SENTRY_ENVIRONMENT`. Deploying `fix/quality-run-2026-06-10` without adding them re-breaks the email funnel, credentialed cookie auth, and env-derived domains. See `docs/architecture/DEPLOYMENT_TOPOLOGY.md` § "Deploy-time env gaps".
+- **Pre-deploy gate BL-001 — resolved on branch, pending merge (2026-06-11)**: the `deploy-uat.yml` env upsert now sets `FRONTEND_BASE_URL`, `NEXT_PUBLIC_APP_URL`, `CORS_ORIGINS` (exact UAT origins), `ENVIRONMENT=uat`, `SENTRY_DSN` (from the optional `EMPLOYED_UAT_SENTRY_DSN` secret), and `SENTRY_ENVIRONMENT=uat`. Takes effect on the first deploy after the branch merges to `uat`. See `docs/architecture/DEPLOYMENT_TOPOLOGY.md` § "Deploy-time env gaps".
 
 ## Restart procedure
 

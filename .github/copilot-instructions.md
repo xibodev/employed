@@ -49,11 +49,11 @@ UAT is live on Box 3 and stable, so the next priority is hardening
 the gaps below on UAT. Each item should ship as its own PR with a green CI
 run before merge.
 
-> **Hard pre-deploy gate for branch `fix/quality-run-2026-06-10` (BL-001):**
-> the `deploy-uat.yml` env upsert must first add `FRONTEND_BASE_URL`,
-> `NEXT_PUBLIC_APP_URL`, `CORS_ORIGINS`, `ENVIRONMENT`, `SENTRY_DSN`,
-> `SENTRY_ENVIRONMENT` — see `docs/architecture/DEPLOYMENT_TOPOLOGY.md`
-> § "Deploy-time env gaps".
+> **Pre-deploy gate BL-001 for branch `fix/quality-run-2026-06-10`:
+> resolved on branch, pending merge (2026-06-11).** The `deploy-uat.yml` env
+> upsert now adds `FRONTEND_BASE_URL`, `NEXT_PUBLIC_APP_URL`, `CORS_ORIGINS`,
+> `ENVIRONMENT`, `SENTRY_DSN`, `SENTRY_ENVIRONMENT` — see
+> `docs/architecture/DEPLOYMENT_TOPOLOGY.md` § "Deploy-time env gaps".
 
 Concrete gaps (in priority order):
 

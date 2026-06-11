@@ -1,7 +1,7 @@
 ---
-last_verified: 2026-06-11T01:31:02Z
-git_ref: fix/quality-run-2026-06-10 @ 5868453 (28 commits ahead of uat @ 00aa899)
-verified_by: quality run 2026-06-10_120309 — codebase cartography
+last_verified: 2026-06-11T04:50:00Z
+git_ref: fix/quality-run-2026-06-10 (uat baseline 00aa899)
+verified_by: quality run 2026-06-10_120309 — cartography + fix-executor follow-up
 ---
 
 # Config & Secrets Map — Employed
@@ -101,9 +101,11 @@ runtime config. Backend reads everything through `backend/app/config.py`
 
 ## Known gaps (this branch vs deploy pipeline)
 
-`deploy-uat.yml` does not yet upsert: `FRONTEND_BASE_URL`,
-`NEXT_PUBLIC_APP_URL`, `CORS_ORIGINS`, `ENVIRONMENT`, `SENTRY_DSN`,
-`SENTRY_ENVIRONMENT`, `TRUSTED_PROXY_IPS` (default acceptable for Box 3
-Caddy-on-localhost). All are documented as names in `deploy/.env.example`
-(EMP-011 commit) and must be added before/with the next UAT deploy — see
+**Resolved on branch, pending merge (BL-001 / CARTO-002, 2026-06-11):**
+`deploy-uat.yml` now upserts `FRONTEND_BASE_URL`, `NEXT_PUBLIC_APP_URL`,
+`CORS_ORIGINS` (exact UAT origins), `ENVIRONMENT=uat`, `SENTRY_DSN` (from the
+optional `EMPLOYED_UAT_SENTRY_DSN` Actions secret; empty value = backend
+no-op) and `SENTRY_ENVIRONMENT=uat`. Takes effect on the first post-merge
+deploy. Remaining deliberate gap: `TRUSTED_PROXY_IPS` is not upserted — the
+loopback/RFC1918 default is correct for Box 3 Caddy-on-localhost. See
 DEPLOYMENT_TOPOLOGY.md "Deploy-time env gaps".

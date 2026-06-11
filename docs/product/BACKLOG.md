@@ -1,9 +1,9 @@
 # Employed — Backlog
 
 ```yaml
-last_verified: 2026-06-11T01:44:01Z
-verified_by: backlog-feature-steward (quality run 2026-06-10_120309)
-branch: fix/quality-run-2026-06-10 @ 7f4b5b8 (uat baseline 00aa899)
+last_verified: 2026-06-11T04:50:00Z
+verified_by: fix-executor follow-up pass (quality run 2026-06-10_120309)
+branch: fix/quality-run-2026-06-10 (uat baseline 00aa899)
 ```
 
 Actionable items only, each with an owner and the evidence that put it here.
@@ -15,17 +15,17 @@ tracks the work to remove them.
 
 ## P0 — prerequisites BEFORE merging/deploying `fix/quality-run-2026-06-10`
 
-> **BL-001 is a hard pre-merge/pre-deploy gate.** Deploying the fix branch
-> without it ships the new code with a deploy-env that never sets the variables
-> the fixes depend on: email links fall back away from the frontend (re-breaking
-> the EMP-004 funnel), credentialed cookie refresh fails against wildcard CORS
-> (EMP-006), and robots/sitemap/market hosts lose their env-derived domains
-> (EMP-013/024).
+> **BL-001 gate: resolved on branch, pending merge (2026-06-11).** The
+> `deploy-uat.yml` env upsert now sets every variable the fixes depend on
+> (`FRONTEND_BASE_URL`, `NEXT_PUBLIC_APP_URL`, exact-origin `CORS_ORIGINS`,
+> `ENVIRONMENT=uat`, `SENTRY_DSN`, `SENTRY_ENVIRONMENT=uat`). The gate fully
+> clears when the branch merges to `uat` and a green deploy run applies the
+> upsert on Box 3.
 
 | ID | Item | Status | Owner | Source / evidence |
 |---|---|---|---|---|
-| BL-001 | **CARTO-002:** extend the `deploy-uat.yml` env upsert with `FRONTEND_BASE_URL`, `NEXT_PUBLIC_APP_URL`, `CORS_ORIGINS`, `ENVIRONMENT`, `SENTRY_DSN`, `SENTRY_ENVIRONMENT` (names only here; values from Actions secrets/vars per CREDENTIALS.md). Verified missing at `.github/workflows/deploy-uat.yml` upsert block on 2026-06-10. | `planned` | engineering | `architecture/repo-map.json` CARTO-002; workflow inspection this pass |
-| BL-002 | Set `CORS_ORIGINS` to the **exact frontend origins** in every deployed env before cookie-auth (EMP-006) ships — credentialed CORS cannot use the wildcard default. Pairs with BL-001 (the upsert must carry it). | `planned` | operator | `fix-execution/execution-report.json` operator actions |
+| BL-001 | **CARTO-002:** extend the `deploy-uat.yml` env upsert with `FRONTEND_BASE_URL`, `NEXT_PUBLIC_APP_URL`, `CORS_ORIGINS`, `ENVIRONMENT`, `SENTRY_DSN`, `SENTRY_ENVIRONMENT`. **Resolved on branch 2026-06-11** — upsert block extended (validated: YAML parse + `bash -n` on the deploy script); `SENTRY_DSN` reads the optional `EMPLOYED_UAT_SENTRY_DSN` secret (empty-safe). Pending merge + deploy to take effect on Box 3. | `tested_locally` | engineering | `architecture/repo-map.json` CARTO-002; `.github/workflows/deploy-uat.yml` upsert block this commit |
+| BL-002 | Set `CORS_ORIGINS` to the **exact frontend origins** in every deployed env before cookie-auth (EMP-006) ships. **UAT covered by BL-001** (workflow upserts the three `*.employed.xibodev.com` origins); remains an operator checklist item for any future env (prod) whose origins differ. | `planned` (UAT covered) | operator | `fix-execution/execution-report.json` operator actions; BL-001 upsert |
 
 ## P1 — unblock the in-flight release / open decisions
 

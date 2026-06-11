@@ -50,10 +50,11 @@ box): httpOnly `employed_refresh_token` cookie (refresh out of localStorage),
 Redis-backed rate limit/lockout, X-Forwarded-Host market resolution,
 frontend-targeted email links, working anonymous-post reCAPTCHA, admin
 reports fix, runtime `window.__ENV` config, mandatory mobile-money webhook
-timestamps. Pre-deploy gates (BL-001/BL-002): extend the `deploy-uat.yml` env
-upsert with `FRONTEND_BASE_URL`, `NEXT_PUBLIC_APP_URL`, `CORS_ORIGINS`,
-`ENVIRONMENT`, `SENTRY_DSN`, `SENTRY_ENVIRONMENT`. Full detail:
-`docs/product/RELEASE_NOTES.md`.
+timestamps. Pre-deploy gate BL-001/BL-002: **resolved on branch 2026-06-11** —
+the `deploy-uat.yml` env upsert now sets `FRONTEND_BASE_URL`,
+`NEXT_PUBLIC_APP_URL`, exact-origin `CORS_ORIGINS`, `ENVIRONMENT=uat`,
+`SENTRY_DSN`, `SENTRY_ENVIRONMENT=uat`; applies on the first post-merge
+deploy. Full detail: `docs/product/RELEASE_NOTES.md`.
 
 ---
 
@@ -186,7 +187,7 @@ Facebook, GitHub, and Twitter OAuth env slots exist in examples, but those provi
 | `DATABASE_URL` | `postgresql://employed:<secret>@postgres:5432/employed` | In-compose Postgres on Box 3. |
 | `REDIS_URL` | `redis://redis:6379/0` | In-compose Redis on Box 3. |
 | `NEXT_PUBLIC_API_URL` | `https://api.employed.xibodev.com` | Live build: baked at image build. Pending branch: served at runtime via `window.__ENV` (build-arg only a fallback). |
-| `FRONTEND_BASE_URL` / `NEXT_PUBLIC_APP_URL` / `CORS_ORIGINS` / `ENVIRONMENT` | not yet set on Box 3 | Required by the pending branch; must be added to the `deploy-uat.yml` upsert before it deploys (BL-001). |
+| `FRONTEND_BASE_URL` / `NEXT_PUBLIC_APP_URL` / `CORS_ORIGINS` / `ENVIRONMENT` | not yet set on Box 3 (upsert added on branch) | BL-001 resolved on branch 2026-06-11: `deploy-uat.yml` upserts all four (+ `SENTRY_*`); lands on Box 3 with the first post-merge deploy. |
 | `FROM_EMAIL` | `Employed <noreply@xibodev.com>` now | Switch to `noreply@employed.xibodev.com` after Resend verification. |
 | `ADMIN_EMAIL` | `admin@employed.co.mz` | Current deploy value; verify mailbox/domain before relying on it. |
 | `SMTP_*` | Resend SMTP relay | UAT uses port `465` + SSL. |
@@ -201,7 +202,7 @@ Facebook, GitHub, and Twitter OAuth env slots exist in examples, but those provi
 
 ## TODO — critical path to make UAT release-gated
 
-0. **NEW (hard pre-deploy gate, BL-001/BL-002):** extend the `deploy-uat.yml` env upsert with `FRONTEND_BASE_URL`, `NEXT_PUBLIC_APP_URL`, `CORS_ORIGINS`, `ENVIRONMENT`, `SENTRY_DSN`, `SENTRY_ENVIRONMENT` before merging/deploying `fix/quality-run-2026-06-10`.
+0. ~~**NEW (hard pre-deploy gate, BL-001/BL-002):** extend the `deploy-uat.yml` env upsert with `FRONTEND_BASE_URL`, `NEXT_PUBLIC_APP_URL`, `CORS_ORIGINS`, `ENVIRONMENT`, `SENTRY_DSN`, `SENTRY_ENVIRONMENT`.~~ **DONE in repo 2026-06-11** — upsert block extended on the fix branch; takes effect on the first post-merge deploy (live box unchanged until then).
 1. ~~**Fix worker health status.**~~ **DONE in repo** — Redis-ping healthcheck committed in `deploy/docker-compose.prod.yml`; takes effect on the next deploy (live box still shows the false-negative until then).
 2. ~~**Create UptimeRobot monitors.**~~ **DONE 2026-05-29.** Frontend `803170467` and API `803177488` (`/health`) both LIVE. See `docs/operations/uptime-robot.md`.
 3. **Provision Sentry**: create `employed-api` + `employed-frontend` in org `nmtss` and set `SENTRY_DSN` + `SENTRY_ENVIRONMENT=uat` in the deploy env. (SDK wiring already done on both ends — backend `init_sentry()`, frontend `@sentry/nextjs`.)

@@ -9,6 +9,10 @@
 #   EMPLOYED_UAT_GOOGLE_CLIENT_ID, EMPLOYED_UAT_GOOGLE_CLIENT_SECRET
 #   EMPLOYED_UAT_RESEND_API_KEY
 #
+# Optional GitHub secrets (an absent secret resolves to an empty string;
+# the backend no-ops on an empty SENTRY_DSN — see backend/app/observability.py):
+#   EMPLOYED_UAT_SENTRY_DSN
+#
 # Box 3 layout:
 #   /opt/employed/docker-compose.yml  — production compose (GHCR images)
 #   /opt/employed/.env                — secrets (chmod 600, not committed)
@@ -111,11 +115,12 @@ jobs:
           GOOGLE_CLIENT_ID: ${{ secrets.EMPLOYED_UAT_GOOGLE_CLIENT_ID }}
           GOOGLE_CLIENT_SECRET: ${{ secrets.EMPLOYED_UAT_GOOGLE_CLIENT_SECRET }}
           RESEND_API_KEY: ${{ secrets.EMPLOYED_UAT_RESEND_API_KEY }}
+          SENTRY_DSN: ${{ secrets.EMPLOYED_UAT_SENTRY_DSN }}
         with:
           host: ${{ secrets.BOX3_HOST }}
           username: ubuntu
           key: ${{ secrets.BOX3_SSH_KEY }}
-          envs: POSTGRES_PASSWORD,SECRET_KEY,IP_SALT,STRIPE_SK,STRIPE_WH,STRIPE_PK,RECAPTCHA_SK,RECAPTCHA_SITE,GOOGLE_CLIENT_ID,GOOGLE_CLIENT_SECRET,RESEND_API_KEY
+          envs: POSTGRES_PASSWORD,SECRET_KEY,IP_SALT,STRIPE_SK,STRIPE_WH,STRIPE_PK,RECAPTCHA_SK,RECAPTCHA_SITE,GOOGLE_CLIENT_ID,GOOGLE_CLIENT_SECRET,RESEND_API_KEY,SENTRY_DSN
           script: |
             set -e
 
@@ -160,6 +165,16 @@ jobs:
             upsert NEXT_PUBLIC_API_URL  https://api.employed.xibodev.com
             upsert FROM_EMAIL           "Employed <noreply@xibodev.com>"
             upsert ADMIN_EMAIL          admin@employed.co.mz
+
+            # BL-001 / CARTO-002: runtime config required by the fix branch.
+            # URLs are the public UAT hostnames (Rule 2) — this workflow is
+            # UAT-specific by design, matching NEXT_PUBLIC_API_URL above.
+            upsert ENVIRONMENT          uat
+            upsert FRONTEND_BASE_URL    https://employed.xibodev.com
+            upsert NEXT_PUBLIC_APP_URL  https://employed.xibodev.com
+            upsert CORS_ORIGINS         "https://employed.xibodev.com,https://mx.employed.xibodev.com,https://mz.employed.xibodev.com"
+            upsert SENTRY_DSN           "$SENTRY_DSN"
+            upsert SENTRY_ENVIRONMENT   uat
 
             # Pull updated images and restart services
             docker compose pull

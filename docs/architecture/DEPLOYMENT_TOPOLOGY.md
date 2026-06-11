@@ -1,7 +1,7 @@
 ---
-last_verified: 2026-06-11T01:31:02Z
-git_ref: fix/quality-run-2026-06-10 @ 5868453 (28 commits ahead of uat @ 00aa899)
-verified_by: quality run 2026-06-10_120309 — codebase cartography
+last_verified: 2026-06-11T04:50:00Z
+git_ref: fix/quality-run-2026-06-10 (uat baseline 00aa899)
+verified_by: quality run 2026-06-10_120309 — cartography + fix-executor follow-up
 ---
 
 # Deployment Topology — Employed
@@ -92,26 +92,28 @@ GitHub secrets consumed by deploy (names only): `BOX3_HOST`, `BOX3_SSH_KEY`,
 `EMPLOYED_UAT_DB_PASSWORD`, `EMPLOYED_UAT_SECRET_KEY`, `EMPLOYED_UAT_IP_SALT`,
 `EMPLOYED_UAT_STRIPE_SK/_WH_SECRET/_PK`,
 `EMPLOYED_UAT_RECAPTCHA_SITE_KEY/_SECRET_KEY`,
-`EMPLOYED_UAT_GOOGLE_CLIENT_ID/_SECRET`, `EMPLOYED_UAT_RESEND_API_KEY`.
+`EMPLOYED_UAT_GOOGLE_CLIENT_ID/_SECRET`, `EMPLOYED_UAT_RESEND_API_KEY`,
+plus optional `EMPLOYED_UAT_SENTRY_DSN` (absent → empty → Sentry no-op).
 
 ## Deploy-time env gaps (observed against this branch's code)
 
-The `deploy-uat.yml` env-upsert block does **not** yet set several variables
-this branch's code reads at runtime:
+**Resolved on branch, pending merge (BL-001 / CARTO-002, 2026-06-11).** The
+`deploy-uat.yml` env-upsert block now sets the variables this branch's code
+reads at runtime:
 
-- `FRONTEND_BASE_URL` — email verify/reset links (EMP-004); without it the
-  backend falls back to the request base URL (the API host — wrong surface).
-- `NEXT_PUBLIC_APP_URL` — market-host/robots/sitemap derivation (EMP-013/024);
-  without it the frontend falls back to `localhost`/lvh.me hosts.
-- `CORS_ORIGINS` — required for credentialed (cookie) refresh from the
-  browser; the wildcard default applies only in development (EMP-006
-  follow-up).
-- `ENVIRONMENT` — drives HSTS/secure-cookie/dev-default behavior.
-- `SENTRY_DSN` / `SENTRY_ENVIRONMENT` — pending Sentry provisioning (EMP-011).
+- `FRONTEND_BASE_URL=https://employed.xibodev.com` — email verify/reset links
+  (EMP-004).
+- `NEXT_PUBLIC_APP_URL=https://employed.xibodev.com` — market-host/robots/
+  sitemap derivation (EMP-013/024).
+- `CORS_ORIGINS` — exact UAT origins (`employed`, `mx.employed`,
+  `mz.employed` on `.xibodev.com`) for credentialed cookie refresh (EMP-006).
+- `ENVIRONMENT=uat` — HSTS/secure-cookie/dev-default gating.
+- `SENTRY_DSN` (optional `EMPLOYED_UAT_SENTRY_DSN` secret; empty-safe) /
+  `SENTRY_ENVIRONMENT=uat` — live once Sentry is provisioned (EMP-011/BL-003).
 
-These are operator/deploy-pipeline updates, documented as env **names** in
-`deploy/.env.example`; the next `uat` deploy should add them in the upsert
-block.
+Deliberately not upserted: `TRUSTED_PROXY_IPS` (loopback/RFC1918 default is
+correct for Box 3's Caddy-on-localhost). The new values land on Box 3 with the
+first post-merge deploy run.
 
 ## Backups / persistence
 
