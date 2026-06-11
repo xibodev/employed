@@ -1,2 +1,5 @@
-pymongo>=4.6
-tqdm>=4.66
+# Legacy Meteor->Postgres migration tooling ONLY. Deliberately excluded from
+# the runtime image (EMP-021) — install manually when running the one-off
+# migration scripts.
+pymongo==4.10.1
+tqdm==4.67.1

@@ -1,3 +1,4 @@
-stripe>=7.0.0
-arq>=0.25
-redis>=5.0
+# Pinned for reproducible builds (EMP-021).
+stripe==7.11.0
+arq==0.27.0
+redis==5.0.1

@@ -11,14 +11,18 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends build-essential libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
-COPY requirements*.txt ./
+# EMP-021: only the runtime requirement sets — the previous glob also baked
+# requirements-migration.txt (pymongo/tqdm legacy tooling) and
+# requirements-test.txt into the production image.
+COPY requirements.txt requirements-api.txt requirements-payments.txt ./
 
 RUN python -m venv /opt/venv \
     && python - <<'PY'
 from pathlib import Path
+RUNTIME_REQUIREMENTS = ("requirements.txt", "requirements-api.txt", "requirements-payments.txt")
 requirements = []
-for path in sorted(Path('.').glob('requirements*.txt')):
-    for line in path.read_text().splitlines():
+for name in RUNTIME_REQUIREMENTS:
+    for line in Path(name).read_text().splitlines():
         stripped = line.strip()
         if stripped and not stripped.startswith('#') and stripped not in requirements:
             requirements.append(stripped)

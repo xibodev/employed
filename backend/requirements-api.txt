@@ -1,8 +1,9 @@
-fastapi
-uvicorn[standard]
-python-jose[cryptography]
-bcrypt
-python-slugify
-bleach
-httpx
-python-multipart
+# Pinned for reproducible builds (EMP-021).
+fastapi==0.135.2
+uvicorn[standard]==0.42.0
+python-jose[cryptography]==3.3.0
+bcrypt==5.0.0
+python-slugify==8.0.4
+bleach==6.3.0
+httpx==0.28.1
+python-multipart==0.0.20
