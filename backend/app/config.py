@@ -63,6 +63,10 @@ class Settings(BaseSettings):
     # Privacy: salt used to hash MSISDN / IP before logging
     ip_salt: str | None = Field(default=None, alias="IP_SALT")
 
+    # Comma-separated IPs/CIDRs whose X-Forwarded-For headers are trusted
+    # (defaults to loopback + RFC1918; see app.middleware.rate_limit)
+    trusted_proxy_ips: str | None = Field(default=None, alias="TRUSTED_PROXY_IPS")
+
     # Public base URLs (used for OAuth + email links)
     app_base_url: str | None = Field(default=None, alias="APP_BASE_URL")
     frontend_base_url: str | None = Field(default=None, alias="FRONTEND_BASE_URL")

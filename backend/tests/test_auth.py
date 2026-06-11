@@ -306,3 +306,36 @@ def test_find_user_by_provider_matches_oauth_providers_map(db_session, user_fact
     assert found is not None
     assert found.id == user.id
     assert _find_user_by_provider(db_session, "google", "missing-sub") is None
+
+
+def test_lockout_is_scoped_to_attacker_ip_not_just_email(client, test_user, monkeypatch):
+    """EMP-020 regression: 5 junk attempts from one IP must not lock the
+    victim's account for everyone (trivial DoS when keyed by email only)."""
+    monkeypatch.setattr("app.routers.auth._client_ip", lambda request: "203.0.113.66")
+    for _ in range(5):
+        response = client.post("/auth/login", json={"email": test_user.email, "password": "wrong-password"})
+        assert response.status_code == 401
+
+    # Attacker IP is locked out even with correct credentials
+    locked = client.post("/auth/login", json={"email": test_user.email, "password": "password123"})
+    assert locked.status_code == 401
+
+    # The victim logging in from their own IP is unaffected
+    monkeypatch.setattr("app.routers.auth._client_ip", lambda request: "198.51.100.20")
+    victim = client.post("/auth/login", json={"email": test_user.email, "password": "password123"})
+    assert victim.status_code == 200
+
+
+def test_lockout_clears_on_successful_login(client, test_user, monkeypatch):
+    monkeypatch.setattr("app.routers.auth._client_ip", lambda request: "198.51.100.30")
+    for _ in range(3):
+        client.post("/auth/login", json={"email": test_user.email, "password": "wrong-password"})
+
+    ok = client.post("/auth/login", json={"email": test_user.email, "password": "password123"})
+    assert ok.status_code == 200
+
+    # Counter was reset: three more failures do not lock yet
+    for _ in range(3):
+        client.post("/auth/login", json={"email": test_user.email, "password": "wrong-password"})
+    again = client.post("/auth/login", json={"email": test_user.email, "password": "password123"})
+    assert again.status_code == 200

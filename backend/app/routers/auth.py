@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import threading
 import time
 from collections import defaultdict, deque
@@ -23,7 +24,7 @@ from app.auth.passwords import hash_password, verify_password
 from app.auth.revocation import is_revoked, revoke_jti
 from app.config import settings
 from app.database import get_db
-from app.middleware.rate_limit import rate_limit
+from app.middleware.rate_limit import _client_ip, close_quietly, rate_limit, redis_client
 from app.schemas.auth import (
     ForgotPasswordRequest,
     LoginRequest,
@@ -40,20 +41,26 @@ from app.services.model_utils import get_attr, get_model_field, query_all, resol
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
+logger = logging.getLogger(__name__)
+
 FAILED_LOGIN_LIMIT = 5
 FAILED_LOGIN_WINDOW_SECONDS = 15 * 60
 FAILED_LOGIN_LOCKOUT_SECONDS = 15 * 60
 INVALID_LOGIN_DETAIL = "Invalid email or password"
 
+LOCKOUT_LOCK_PREFIX = "auth:lockout:"
+LOCKOUT_FAILS_PREFIX = "auth:lockout-fails:"
+
 
 class FailedLoginTracker:
+    """In-process fallback lockout store (used when Redis is unavailable).
+
+    Keys are opaque composite strings (see _lockout_key)."""
+
     def __init__(self) -> None:
         self._attempts: dict[str, deque[float]] = defaultdict(deque)
         self._locks: dict[str, float] = {}
         self._lock = threading.Lock()
-
-    def _normalize(self, email: str) -> str:
-        return (email or "").strip().lower()
 
     def _prune(self, key: str, now: float) -> None:
         cutoff = now - FAILED_LOGIN_WINDOW_SECONDS
@@ -66,16 +73,14 @@ class FailedLoginTracker:
         if not bucket:
             self._attempts.pop(key, None)
 
-    def is_locked(self, email: str) -> bool:
-        key = self._normalize(email)
+    def is_locked(self, key: str) -> bool:
         now = time.time()
         with self._lock:
             self._prune(key, now)
             locked_until = self._locks.get(key)
             return bool(locked_until and locked_until > now)
 
-    def record_failure(self, email: str) -> None:
-        key = self._normalize(email)
+    def record_failure(self, key: str) -> None:
         now = time.time()
         with self._lock:
             self._prune(key, now)
@@ -86,8 +91,7 @@ class FailedLoginTracker:
                 bucket.clear()
                 self._attempts.pop(key, None)
 
-    def record_success(self, email: str) -> None:
-        key = self._normalize(email)
+    def record_success(self, key: str) -> None:
         with self._lock:
             self._locks.pop(key, None)
             self._attempts.pop(key, None)
@@ -99,6 +103,59 @@ class FailedLoginTracker:
 
 
 failed_login_tracker = FailedLoginTracker()
+
+
+def _lockout_key(email: str, client_ip: str) -> str:
+    """Lockout key scoped to (email, client IP) — EMP-020.
+
+    Keying on email alone let anyone lock a victim's account with 5 junk
+    attempts; scoping to the requesting IP keeps brute-force protection
+    while removing the trivial DoS."""
+    return f"{(email or '').strip().lower()}|{client_ip}"
+
+
+def _lockout_is_locked(key: str) -> bool:
+    client = redis_client()
+    if client is not None:
+        try:
+            return client.get(f"{LOCKOUT_LOCK_PREFIX}{key}") is not None
+        except Exception:  # noqa: BLE001 — fall back to in-process store
+            logger.warning("auth.lockout.redis_read_failed", exc_info=True)
+        finally:
+            close_quietly(client)
+    return failed_login_tracker.is_locked(key)
+
+
+def _lockout_record_failure(key: str) -> None:
+    client = redis_client()
+    if client is not None:
+        try:
+            fails_key = f"{LOCKOUT_FAILS_PREFIX}{key}"
+            fails = int(client.incr(fails_key))
+            if fails == 1:
+                client.expire(fails_key, FAILED_LOGIN_WINDOW_SECONDS)
+            if fails >= FAILED_LOGIN_LIMIT:
+                client.set(f"{LOCKOUT_LOCK_PREFIX}{key}", "1", ex=FAILED_LOGIN_LOCKOUT_SECONDS)
+                client.delete(fails_key)
+            return
+        except Exception:  # noqa: BLE001
+            logger.warning("auth.lockout.redis_write_failed", exc_info=True)
+        finally:
+            close_quietly(client)
+    failed_login_tracker.record_failure(key)
+
+
+def _lockout_record_success(key: str) -> None:
+    client = redis_client()
+    if client is not None:
+        try:
+            client.delete(f"{LOCKOUT_LOCK_PREFIX}{key}", f"{LOCKOUT_FAILS_PREFIX}{key}")
+            return
+        except Exception:  # noqa: BLE001
+            logger.warning("auth.lockout.redis_clear_failed", exc_info=True)
+        finally:
+            close_quietly(client)
+    failed_login_tracker.record_success(key)
 
 
 def _user_model():
@@ -286,18 +343,19 @@ def register(payload: RegisterRequest, request: Request, db: Any = Depends(get_d
 
 
 @router.post("/login", response_model=TokenResponse, dependencies=[Depends(rate_limit(10, 60, "auth_login"))])
-def login(payload: LoginRequest, db: Any = Depends(get_db)):
-    if failed_login_tracker.is_locked(payload.email):
+def login(payload: LoginRequest, request: Request, db: Any = Depends(get_db)):
+    lockout_key = _lockout_key(payload.email, _client_ip(request))
+    if _lockout_is_locked(lockout_key):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=INVALID_LOGIN_DETAIL)
     user = _find_user_by_email(db, payload.email)
     if user is None:
-        failed_login_tracker.record_failure(payload.email)
+        _lockout_record_failure(lockout_key)
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=INVALID_LOGIN_DETAIL)
     hashed = get_attr(user, "password_hash", "hashed_password", "passwordHash")
     if not verify_password(payload.password, hashed):
-        failed_login_tracker.record_failure(payload.email)
+        _lockout_record_failure(lockout_key)
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=INVALID_LOGIN_DETAIL)
-    failed_login_tracker.record_success(payload.email)
+    _lockout_record_success(lockout_key)
     return _token_response(user)
 
 
