@@ -407,9 +407,11 @@ def test_oauth_links_existing_account_only_with_verified_email_claim(client, use
 
     response = client.get("/auth/oauth/google/callback?code=oauth-code")
 
-    assert response.status_code == 200
-    # A NEW account is created instead of taking over the victim's account
-    assert response.json()["user"]["id"] != victim.id
+    # The takeover attempt is rejected outright (no duplicate account is
+    # possible either: users.email is unique).
+    assert response.status_code == 403
+    assert "not verified" in response.json()["detail"].lower()
+    assert victim.email == "victim@example.com"
 
 
 def test_oauth_links_existing_account_with_verified_email_claim(client, user_factory, monkeypatch):
