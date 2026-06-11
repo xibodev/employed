@@ -51,13 +51,18 @@ type AuthResponse = {
 };
 
 const TOKEN_KEY = "employed_token";
-const REFRESH_TOKEN_KEY = "employed_refresh_token";
+const LEGACY_REFRESH_TOKEN_KEY = "employed_refresh_token";
 const TOKEN_COOKIE = "employed_token";
 const ADMIN_COOKIE = "employed_is_admin";
 const REFRESH_BUFFER_MS = 60_000;
 const FALLBACK_REFRESH_MS = 15 * 60 * 1000;
 
 const AuthContext = createContext<AuthContextValue | null>(null);
+
+// EMP-006: the refresh token is never persisted to localStorage (XSS would
+// yield a 7-day account takeover). It lives in memory for the current tab;
+// across reloads the httpOnly cookie set by the API carries it instead.
+let inMemoryRefreshToken: string | null = null;
 
 function getStoredToken(): string | null {
   if (typeof window === "undefined") {
@@ -67,18 +72,22 @@ function getStoredToken(): string | null {
   return window.localStorage.getItem(TOKEN_KEY);
 }
 
-function getStoredRefreshToken(): string | null {
-  if (typeof window === "undefined") {
-    return null;
-  }
+function getRefreshToken(): string | null {
+  return inMemoryRefreshToken;
+}
 
-  return window.localStorage.getItem(REFRESH_TOKEN_KEY);
+function clearLegacyRefreshToken() {
+  if (typeof window !== "undefined") {
+    // Migration cleanup: remove refresh tokens persisted by older builds.
+    window.localStorage.removeItem(LEGACY_REFRESH_TOKEN_KEY);
+  }
 }
 
 function clearStoredToken() {
+  inMemoryRefreshToken = null;
   if (typeof window !== "undefined") {
     window.localStorage.removeItem(TOKEN_KEY);
-    window.localStorage.removeItem(REFRESH_TOKEN_KEY);
+    clearLegacyRefreshToken();
   }
 }
 
@@ -160,14 +169,16 @@ function isVerifiedUser(user: AppUser | null) {
 }
 
 function persistToken(token: string, refreshToken?: string) {
+  if (refreshToken) {
+    inMemoryRefreshToken = refreshToken;
+  }
+
   if (typeof window === "undefined") {
     return;
   }
 
   window.localStorage.setItem(TOKEN_KEY, token);
-  if (refreshToken) {
-    window.localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
-  }
+  clearLegacyRefreshToken();
   const expiresAt = parseJwtExpiry(token) ?? Date.now() + 7 * 24 * 60 * 60 * 1000;
   setCookie(TOKEN_COOKIE, token, expiresAt);
 }
@@ -219,8 +230,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = useCallback(() => {
     clearRefreshTimer();
     // Capture the refresh token BEFORE clearing local state so the server can
-    // revoke its JTI in Redis. Best-effort; ignore failures.
-    const refreshTokenToRevoke = getStoredRefreshToken();
+    // revoke its JTI in Redis. Best-effort; ignore failures. With credentials
+    // included the httpOnly refresh cookie is revoked and cleared server-side.
+    const refreshTokenToRevoke = getRefreshToken();
     clearStoredToken();
     clearCookie(TOKEN_COOKIE);
     clearCookie(ADMIN_COOKIE);
@@ -233,27 +245,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
     void apiFetch<void>("/auth/logout", {
       method: "POST",
+      credentials: "include",
       body: refreshTokenToRevoke ? { refresh_token: refreshTokenToRevoke } : undefined,
     }).catch(() => undefined);
   }, [clearRefreshTimer]);
 
   const refreshToken = useCallback(async () => {
-    const storedRefreshToken = getStoredRefreshToken();
-    if (!storedRefreshToken) {
-      logout();
-      return;
-    }
+    // The in-memory token covers this tab; after a reload the httpOnly
+    // cookie (credentials: "include") carries the refresh token instead.
+    const storedRefreshToken = getRefreshToken();
 
     try {
       const payload = await apiFetch<AuthResponse>("/auth/refresh", {
         method: "POST",
-        body: { refresh_token: storedRefreshToken },
+        body: storedRefreshToken ? { refresh_token: storedRefreshToken } : {},
         cache: "no-store",
+        credentials: "include",
       });
       const nextToken = payload.token ?? payload.accessToken ?? payload.access_token ?? (getStoredToken() ?? "");
       const nextRefresh = payload.refreshToken ?? payload.refresh_token ?? storedRefreshToken;
       const user = payload.user ?? (await fetchMe(nextToken));
-      applyAuth(user, nextToken, nextRefresh);
+      applyAuth(user, nextToken, nextRefresh ?? undefined);
     } catch {
       logout();
     }
@@ -281,6 +293,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         method: "POST",
         body: { email, password },
         cache: "no-store",
+        credentials: "include",
       });
       const token = payload.token ?? payload.accessToken ?? payload.access_token;
       if (!token) {

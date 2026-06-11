@@ -19,7 +19,9 @@ class RegisterRequest(BaseModel):
 
 
 class RefreshTokenRequest(BaseModel):
-    refresh_token: str
+    # Optional: browser clients send the refresh token via the httpOnly
+    # cookie instead of the body (EMP-006).
+    refresh_token: str | None = None
 
 
 class ForgotPasswordRequest(BaseModel):

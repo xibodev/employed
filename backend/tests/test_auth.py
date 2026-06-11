@@ -339,3 +339,51 @@ def test_lockout_clears_on_successful_login(client, test_user, monkeypatch):
         client.post("/auth/login", json={"email": test_user.email, "password": "wrong-password"})
     again = client.post("/auth/login", json={"email": test_user.email, "password": "password123"})
     assert again.status_code == 200
+
+
+def test_login_sets_httponly_refresh_cookie(client, test_user):
+    """EMP-006: browsers get the refresh token in an httpOnly cookie scoped
+    to /auth so XSS cannot read it from localStorage."""
+    response = client.post("/auth/login", json={"email": test_user.email, "password": "password123"})
+
+    assert response.status_code == 200
+    set_cookie = response.headers.get("set-cookie", "")
+    assert "employed_refresh_token=" in set_cookie
+    assert "httponly" in set_cookie.lower()
+    assert "path=/auth" in set_cookie.lower()
+    assert "samesite=lax" in set_cookie.lower()
+
+
+def test_refresh_works_with_cookie_only(client, test_user):
+    login = client.post("/auth/login", json={"email": test_user.email, "password": "password123"})
+    assert login.status_code == 200
+
+    # No body token — the TestClient session carries the httpOnly cookie.
+    response = client.post("/auth/refresh", json={})
+
+    assert response.status_code == 200
+    assert response.json()["access_token"]
+
+
+def test_refresh_without_body_or_cookie_returns_401(client):
+    response = client.post("/auth/refresh", json={})
+
+    assert response.status_code == 401
+
+
+def test_logout_revokes_cookie_refresh_token_and_clears_cookie(client, test_user):
+    from app.auth.revocation import reset_memory_store
+
+    reset_memory_store()
+
+    login = client.post("/auth/login", json={"email": test_user.email, "password": "password123"})
+    refresh_token_value = login.json()["refresh_token"]
+
+    logout = client.post("/auth/logout")
+    assert logout.status_code == 200
+    set_cookie = logout.headers.get("set-cookie", "")
+    assert "employed_refresh_token=" in set_cookie  # deletion cookie
+
+    # The JTI from the cookie-carried token is revoked
+    refresh = client.post("/auth/refresh", json={"refresh_token": refresh_token_value})
+    assert refresh.status_code == 401

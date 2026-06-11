@@ -2,12 +2,13 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import threading
 import time
 from collections import defaultdict, deque
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from fastapi.responses import RedirectResponse
 
 from app.auth.dependencies import get_primary_email, get_user_id, get_user_roles, is_email_verified, load_user_by_id
@@ -50,6 +51,33 @@ INVALID_LOGIN_DETAIL = "Invalid email or password"
 
 LOCKOUT_LOCK_PREFIX = "auth:lockout:"
 LOCKOUT_FAILS_PREFIX = "auth:lockout-fails:"
+
+# EMP-006: browser clients receive the refresh token in an httpOnly cookie
+# (scoped to /auth) so an XSS cannot exfiltrate it from localStorage. The
+# token is still returned in the response body for non-browser clients.
+REFRESH_COOKIE_NAME = "employed_refresh_token"
+
+
+def _refresh_cookie_secure() -> bool:
+    environment = str(getattr(settings, "environment", "development") or "development").strip().lower()
+    return environment not in {"development", "dev", "testing", "test"}
+
+
+def _set_refresh_cookie(response: Response, token: str) -> None:
+    days = int(os.getenv("REFRESH_TOKEN_EXPIRE_DAYS", "7"))
+    response.set_cookie(
+        REFRESH_COOKIE_NAME,
+        token,
+        max_age=days * 24 * 60 * 60,
+        httponly=True,
+        samesite="lax",
+        secure=_refresh_cookie_secure(),
+        path="/auth",
+    )
+
+
+def _clear_refresh_cookie(response: Response) -> None:
+    response.delete_cookie(REFRESH_COOKIE_NAME, path="/auth")
 
 
 class FailedLoginTracker:
@@ -343,7 +371,7 @@ def register(payload: RegisterRequest, request: Request, db: Any = Depends(get_d
 
 
 @router.post("/login", response_model=TokenResponse, dependencies=[Depends(rate_limit(10, 60, "auth_login"))])
-def login(payload: LoginRequest, request: Request, db: Any = Depends(get_db)):
+def login(payload: LoginRequest, request: Request, response: Response, db: Any = Depends(get_db)):
     lockout_key = _lockout_key(payload.email, _client_ip(request))
     if _lockout_is_locked(lockout_key):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=INVALID_LOGIN_DETAIL)
@@ -356,13 +384,24 @@ def login(payload: LoginRequest, request: Request, db: Any = Depends(get_db)):
         _lockout_record_failure(lockout_key)
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=INVALID_LOGIN_DETAIL)
     _lockout_record_success(lockout_key)
-    return _token_response(user)
+    token_response = _token_response(user)
+    _set_refresh_cookie(response, token_response.refresh_token)
+    return token_response
 
 
 @router.post("/refresh", response_model=TokenResponse)
-def refresh_token(payload: RefreshTokenRequest, db: Any = Depends(get_db)):
+def refresh_token(
+    request: Request,
+    response: Response,
+    payload: RefreshTokenRequest | None = None,
+    db: Any = Depends(get_db),
+):
+    # Body token (non-browser clients) or httpOnly cookie (browsers, EMP-006).
+    token_value = (payload.refresh_token if payload else None) or request.cookies.get(REFRESH_COOKIE_NAME)
+    if not token_value:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token")
     try:
-        token = decode_token(payload.refresh_token, expected_type="refresh")
+        token = decode_token(token_value, expected_type="refresh")
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token") from exc
     if token.jti and is_revoked(token.jti):
@@ -372,25 +411,29 @@ def refresh_token(payload: RefreshTokenRequest, db: Any = Depends(get_db)):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
     try:
         decode_token(
-            payload.refresh_token,
+            token_value,
             expected_type="refresh",
             password_changed_at=_get_password_changed_at(user),
         )
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token") from exc
-    return _token_response(user)
+    token_response = _token_response(user)
+    _set_refresh_cookie(response, token_response.refresh_token)
+    return token_response
 
 
 @router.post("/logout", response_model=MessageResponse, status_code=status.HTTP_200_OK)
-async def logout(request: Request) -> MessageResponse:
+async def logout(request: Request, response: Response) -> MessageResponse:
     """Logout — revokes the supplied refresh token's JTI in Redis (if provided).
 
     The endpoint accepts an empty body, an empty JSON object ``{}``, or a body
     with ``refresh_token: null`` for backward compatibility with clients that
-    simply want a 200 on POST. When a refresh_token is supplied, its JTI is
-    added to the revocation store so any later /auth/refresh attempt with the
-    same token fails with 401.
+    simply want a 200 on POST. When a refresh_token is supplied (body or
+    httpOnly cookie), its JTI is added to the revocation store so any later
+    /auth/refresh attempt with the same token fails with 401. The refresh
+    cookie is always cleared.
     """
+    _clear_refresh_cookie(response)
     refresh_token_value: str | None = None
     try:
         raw = await request.body()
@@ -404,6 +447,7 @@ async def logout(request: Request) -> MessageResponse:
         # Garbage body — still 200, nothing to revoke.
         return MessageResponse(message="Logged out")
 
+    refresh_token_value = refresh_token_value or request.cookies.get(REFRESH_COOKIE_NAME)
     if refresh_token_value:
         try:
             decoded = decode_token(refresh_token_value, expected_type="refresh")
@@ -489,7 +533,12 @@ def oauth_redirect(provider: str, request: Request):
 
 @router.get("/oauth/{provider}/callback", response_model=TokenResponse, name="oauth_callback")
 async def oauth_callback(
-    provider: str, request: Request, code: str, state: str | None = None, db: Any = Depends(get_db)
+    provider: str,
+    request: Request,
+    response: Response,
+    code: str,
+    state: str | None = None,
+    db: Any = Depends(get_db),
 ):
     if state is None:
         if getattr(exchange_code, "__module__", "") == "app.auth.oauth":
@@ -504,4 +553,6 @@ async def oauth_callback(
         user = _user_model()()
     _set_oauth_fields(user, profile)
     saved = save(db, user)
-    return _token_response(saved)
+    token_response = _token_response(saved)
+    _set_refresh_cookie(response, token_response.refresh_token)
+    return token_response
