@@ -1,9 +1,9 @@
 # Employed — Known Limitations
 
 ```yaml
-last_verified: 2026-06-11T01:44:01Z
-verified_by: backlog-feature-steward (quality run 2026-06-10_120309)
-branch: fix/quality-run-2026-06-10 @ 7f4b5b8 (uat baseline 00aa899)
+last_verified: 2026-06-11T04:50:00Z
+verified_by: fix-executor follow-up pass (quality run 2026-06-10_120309)
+branch: fix/quality-run-2026-06-10 (uat baseline 00aa899)
 ```
 
 What a user, operator, or reviewer will observe today and why. Each limitation
@@ -95,12 +95,14 @@ eslint/tsc/build plus E2E. EMP-026b's per-panel degradation is validated by
 types/build only — the stub-500 Playwright check has not run (finding BFS-003).
 **Remove via:** BL-008.
 
-## KL-10 — Public listing aliases are unoptimized (CARTO-001)
+## KL-10 — Public listing aliases are unoptimized (CARTO-001) — resolved on branch, pending deploy
 
-`/api/jobs` and `/api/featuredJobs` — the endpoints the frontend actually calls —
-still materialize all jobs in Python; the EMP-010 SQL pushdown covered `/jobs` +
-`/jobs/count` only. Listing latency will degrade with catalog growth.
-**Remove via:** BL-006.
+**Fixed on `fix/quality-run-2026-06-10` (2026-06-11, BL-006):** `/api/jobs` and
+`/api/featuredJobs` now reuse the EMP-010 SQL pushdown (predicates, COUNT,
+ORDER BY, LIMIT/OFFSET in SQL) with parity tests pinning the old behavior.
+The **live UAT build still materializes all jobs in Python** until the branch
+merges and deploys. **Remove from live via:** merge + deploy of
+`employed-uat-2026-06-10`.
 
 ## KL-11 — Deploys use floating `:uat` image tags
 

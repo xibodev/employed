@@ -1,9 +1,9 @@
 # Employed — Feature Registry
 
 ```yaml
-last_verified: 2026-06-11T01:44:01Z
-verified_by: backlog-feature-steward (quality run 2026-06-10_120309)
-branch: fix/quality-run-2026-06-10 @ 7f4b5b8 (uat baseline 00aa899)
+last_verified: 2026-06-11T04:50:00Z
+verified_by: fix-executor follow-up pass (quality run 2026-06-10_120309)
+branch: fix/quality-run-2026-06-10 (uat baseline 00aa899)
 live_uat_probe: https://api.employed.xibodev.com/health -> 200 {status ok, db ok, redis ok} at 2026-06-11T01:44:01Z
 ```
 
@@ -39,7 +39,7 @@ verified by direct probe instead of an Atlas API record (finding BFS-005).
 | EMP-F-006 | 90-day listing expiry worker (arq) | `deployed_to_uat` | 2026-05-27 deploy | engineering | Positive empirical evidence: worker transitioned a >90-day job during the 2026-06-10 run (`uat/stack-health-resume.json`). Branch adds `status_history` reason (EMP-017). |
 | EMP-F-007 | Featured-job payments via Stripe (test mode) | `deployed_to_uat` | 2026-05-27 deploy | engineering | Test keys configured; webhook mounted at `POST /webhooks/_stripe/webhook` (503-not-404 verified on sealed stack). Dashboard-URL verification pending (EMP-014, `blocked`). Live keys absent — test mode only. |
 | EMP-F-008 | Featured-job payments via M-Pesa / e-Mola (MZ mobile money) | `deployed_to_uat` (simulator mode only) | 2026-05-27 deploy | engineering | Webhook surfaces deployed; **simulator mode** — no webhook secrets/sandbox credentials configured (see KNOWN_LIMITATIONS). Branch makes callback `timestamp` mandatory (EMP-019, contract change). |
-| EMP-F-009 | Public read API + health endpoints | `deployed_to_uat` | 2026-05-27 deploy | engineering | `GET /health` 200 (db/redis ok) probed 2026-06-11T01:44:01Z; UptimeRobot monitors `803170467` (frontend) + `803177488` (API) UP. Perf caveat CARTO-001: public `/api/jobs` aliases still filter in Python. |
+| EMP-F-009 | Public read API + health endpoints | `deployed_to_uat` | 2026-05-27 deploy | engineering | `GET /health` 200 (db/redis ok) probed 2026-06-11T01:44:01Z; UptimeRobot monitors `803170467` (frontend) + `803177488` (API) UP. Perf caveat CARTO-001 (live build filters `/api/jobs` aliases in Python) fixed on the branch — see CARTO-001 row in §B. |
 | EMP-F-010 | i18n en/pt/es with per-market defaults (mx→es, mz→pt) | `deployed_to_uat` | 2026-05-27 deploy | engineering | Market-default locale serving verified by crawl. **Live gap EMP-027:** auth/account/my-jobs/job-detail/post-job surfaces English-only on pt/es (localization vision score 2.61/5); full catalogs (263 keys/locale) `tested_locally` (`a61af61`). |
 | EMP-F-011 | SEO: robots.txt + sitemap.xml | `deployed_to_uat` | 2026-05-27 deploy | engineering | Both serve 200 (new since prior suite). **Live defect EMP-013/024:** UAT domain hardcoded in source — wrong-for-prod SEO (fix `a7d1cef` derives from `NEXT_PUBLIC_APP_URL`, `tested_locally`). |
 | EMP-F-012 | Account management + "my jobs" dashboard | `deployed_to_uat` | 2026-05-27 deploy | engineering | Headed persona tours 10/10, pages 200, auth injection OK. |
@@ -76,7 +76,8 @@ run exists.**
 | EMP-013+024 | All market/robots/sitemap domains from `NEXT_PUBLIC_APP_URL` | `tested_locally` | 2026-06-10 `a7d1cef` | engineering | grep gate: zero hardcoded domains in `frontend/src` |
 | EMP-012 | Runtime config for API URL + reCAPTCHA site key (Rule 11) | `tested_locally` | 2026-06-10 `7982049` | engineering | tsc/eslint/build; restart-not-rebuild verified by compose design |
 | EMP-015 | Admin user search (find non-admins to promote) | `tested_locally` | 2026-06-10 `7bb648d` | engineering | 3 search regression tests |
-| EMP-010 | `/jobs` search/filter/pagination/count pushed into SQL | `tested_locally` | 2026-06-10 `b14a3c2` | engineering | SQL-shape + parity tests; public aliases NOT covered → CARTO-001 / BL-006 |
+| EMP-010 | `/jobs` search/filter/pagination/count pushed into SQL | `tested_locally` | 2026-06-10 `b14a3c2` | engineering | SQL-shape + parity tests; public aliases covered by the follow-up CARTO-001 row below |
+| CARTO-001 | Public aliases `/api/jobs` + `/api/featuredJobs` on the EMP-010 SQL pushdown | `tested_locally` | 2026-06-11 (this pass) | engineering | Shared `_job_query_pushdown` reuse; parity (market/active/90-day/order/featured) + SQL-shape (LIMIT/COUNT) tests in `tests/test_public_api.py`; closes BL-006 / KL-10 on branch |
 | EMP-016 | Deactivation notification goes to the job owner | `tested_locally` | 2026-06-10 `596d984` | engineering | owner-notification + self-deactivation tests |
 | EMP-017 | Expiry reason in `status_history`; worker importable w/o `REDIS_URL` | `tested_locally` | 2026-06-10 `d26aa78`+`6a102e9` | engineering | new `tests/test_workers.py` |
 | EMP-018 | OAuth linking requires provider verified-email claim | `tested_locally` | 2026-06-10 `2f706fe`+`5ee819e` | engineering | takeover-rejection (403) + verified-claim link tests |

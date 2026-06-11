@@ -7,9 +7,9 @@ from fastapi import APIRouter, Depends, Query, Request
 from app.database import get_db
 from app.middleware.market import get_current_market
 from app.middleware.rate_limit import rate_limit
-from app.routers.jobs import _apply_filters, _job_model, _job_to_read
+from app.routers.jobs import JOB_TYPES, _apply_filters, _job_model, _job_query_pushdown, _job_to_read
 from app.schemas.jobs import JobListResponse, JobRead
-from app.services.model_utils import get_attr, query_all, utcnow
+from app.services.model_utils import get_attr, query_all, query_count, utcnow
 
 router = APIRouter(prefix="/api", tags=["public-api"])
 
@@ -25,7 +25,33 @@ def public_jobs(
     db: Any = Depends(get_db),
     market: dict = Depends(get_current_market),
 ):
-    items = _apply_filters(query_all(db, _job_model()), market, query, jobtype, remote)
+    model = _job_model()
+    pushdown = _job_query_pushdown(model, market, query, jobtype, remote)
+    if pushdown is not None:
+        # CARTO-001: same SQL-side predicates, COUNT(*), ORDER BY and
+        # LIMIT/OFFSET as /jobs (EMP-010) — these aliases are what the
+        # frontend actually calls, so they must not materialize the market.
+        if jobtype and jobtype not in JOB_TYPES:
+            return JobListResponse(items=[], total=0, page=page, page_size=page_size)
+        filters, created_field = pushdown
+        total = query_count(db, model, filters)
+        items = query_all(
+            db,
+            model,
+            filters=filters,
+            order_by=created_field.desc(),
+            limit=page_size,
+            offset=(page - 1) * page_size,
+        )
+        return JobListResponse(
+            items=[_job_to_read(item, request, include_contact=False) for item in items],
+            total=total,
+            page=page,
+            page_size=page_size,
+        )
+
+    # Fallback (test rigs without ORM columns): Python filtering
+    items = _apply_filters(query_all(db, model), market, query, jobtype, remote)
     start = (page - 1) * page_size
     end = start + page_size
     return JobListResponse(
@@ -47,9 +73,20 @@ def public_featured_jobs(
     market: dict = Depends(get_current_market),
 ):
     now = utcnow()
+    model = _job_model()
+    pushdown = _job_query_pushdown(model, market, None, None, None, featured_after=now)
+    if pushdown is not None:
+        # CARTO-001: featured predicate + ORDER BY + LIMIT 3 in SQL. Unlike
+        # /jobs/featured (random sample), this alias keeps its historical
+        # deterministic newest-first contract.
+        filters, created_field = pushdown
+        items = query_all(db, model, filters=filters, order_by=created_field.desc(), limit=3)
+        return [_job_to_read(item, request, include_contact=False) for item in items]
+
+    # Fallback (test rigs without ORM columns): Python filtering
     items = [
         item
-        for item in _apply_filters(query_all(db, _job_model()), market, None, None, None)
+        for item in _apply_filters(query_all(db, model), market, None, None, None)
         if get_attr(item, "featured_through", "featuredThrough")
         and get_attr(item, "featured_through", "featuredThrough") >= now
     ]

@@ -89,8 +89,10 @@ re-seeded sealed Docker stack (`fix-execution/execution-report.json`).
 - Auth user lookups use indexed queries instead of full-table scans
   (`db22497`, EMP-005).
 - `/jobs` search/filter/pagination/count pushed into SQL (`b14a3c2`, EMP-010).
-  *Known residual:* public `/api/jobs` aliases still filter in Python
-  (CARTO-001 / BL-006).
+- Public aliases `/api/jobs` + `/api/featuredJobs` (what the frontend actually
+  calls) moved onto the same SQL pushdown with parity + SQL-shape regression
+  tests; `/api/featuredJobs` keeps its deterministic newest-first contract
+  (CARTO-001 / BL-006, resolved 2026-06-11).
 
 ### Fixed — i18n / SEO / config (locales: en, pt, es)
 
