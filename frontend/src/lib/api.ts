@@ -1,13 +1,15 @@
+import { getApiUrl } from "@/lib/runtime-config";
 import type { ApiErrorShape, Job, JobFormValues, JobsQuery, PaginatedResponse } from "@/lib/types";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
-
 function getApiBaseUrl(): string {
+  // EMP-012 (Rule 11): resolved at call time from runtime config, so an
+  // API-URL change is a restart, not a rebuild.
+  const apiBaseUrl = getApiUrl();
   if (typeof window !== "undefined") {
-    return API_BASE_URL;
+    return apiBaseUrl;
   }
 
-  return API_BASE_URL.replace("http://localhost:3301", "http://backend:8000")
+  return apiBaseUrl.replace("http://localhost:3301", "http://backend:8000")
     .replace("http://127.0.0.1:3301", "http://backend:8000")
     .replace("http://localhost:8000", "http://backend:8000")
     .replace("http://127.0.0.1:8000", "http://backend:8000");

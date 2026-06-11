@@ -5,6 +5,7 @@ import { getMessages } from "next-intl/server";
 
 import Footer from "@/components/layout/Footer";
 import Header from "@/components/layout/Header";
+import { RuntimeEnvScript } from "@/components/layout/RuntimeEnvScript";
 import { AuthProvider } from "@/hooks/useAuth";
 import { MarketProvider } from "@/hooks/useMarket";
 import { resolveMarketFromHeaders } from "@/lib/market";
@@ -32,6 +33,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
   return (
     <html lang={market.locale}>
       <body>
+        <RuntimeEnvScript />
         <NextIntlClientProvider messages={messages}>
           <MarketProvider initialMarket={market}>
             <AuthProvider>

@@ -3,6 +3,8 @@
 import { useEffect } from "react";
 import { GoogleReCaptchaProvider, useGoogleReCaptcha } from "react-google-recaptcha-v3";
 
+import { getRecaptchaSiteKey } from "@/lib/runtime-config";
+
 function TokenRunner({ action, refreshKey, onVerify }: { action: string; refreshKey: number; onVerify: (token: string) => void }) {
   const { executeRecaptcha } = useGoogleReCaptcha();
 
@@ -30,7 +32,8 @@ function TokenRunner({ action, refreshKey, onVerify }: { action: string; refresh
 }
 
 export function RecaptchaWidget({ action, refreshKey, onVerify }: { action: string; refreshKey: number; onVerify: (token: string) => void }) {
-  const siteKey = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY;
+  // EMP-012 (Rule 11): runtime-injected site key wins over the baked value.
+  const siteKey = getRecaptchaSiteKey();
 
   if (!siteKey) {
     return null;

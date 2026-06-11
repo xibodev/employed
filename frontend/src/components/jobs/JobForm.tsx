@@ -14,6 +14,7 @@ import { createJob, updateJob } from "@/lib/api";
 import type { Job, JobFormValues } from "@/lib/types";
 import { useAuth } from "@/hooks/useAuth";
 import { useMarket } from "@/hooks/useMarket";
+import { getRecaptchaSiteKey } from "@/lib/runtime-config";
 import { countryLabel } from "@/lib/utils";
 
 type FormErrors = Partial<Record<keyof JobFormValues, string>> & { form?: string };
@@ -125,7 +126,7 @@ export default function JobForm({ mode, job }: { mode: "create" | "edit"; job?: 
 
     setSubmitting(true);
 
-    if (!isAuthenticated && process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY) {
+    if (!isAuthenticated && getRecaptchaSiteKey()) {
       pendingSubmit.current = true;
       setRecaptchaRefresh((value) => value + 1);
       return;
