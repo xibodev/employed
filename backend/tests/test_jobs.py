@@ -372,3 +372,43 @@ def test_search_filter_results_unchanged_after_pushdown(client, job_factory, sam
     assert {item["title"] for item in by_text.json()["items"]} == {"Backend Engineer", "Marketer"}
     assert [item["title"] for item in by_type.json()["items"]] == ["Marketer"]
     assert invalid_type.json()["total"] == 0
+
+
+def test_admin_deactivation_emails_the_job_owner(
+    client, sample_job, user_factory, test_admin, auth_headers, sample_market_headers, monkeypatch
+):
+    """EMP-016 regression: the notification went to the acting admin."""
+    owner = user_factory(email="job-owner@example.com")
+    job = sample_job(user=owner, status="active")
+    sent: list[tuple[str, str]] = []
+    monkeypatch.setattr(
+        "app.routers.jobs.send_job_status_changed_email",
+        lambda email, title, status, url: sent.append((email, status)),
+    )
+
+    response = client.post(
+        f"/jobs/{job.id}/deactivate",
+        headers=auth_headers(test_admin) | sample_market_headers("mz"),
+    )
+
+    assert response.status_code == 200
+    assert sent == [("job-owner@example.com", "inactive")]
+
+
+def test_owner_self_deactivation_sends_no_email(
+    client, sample_job, test_user, auth_headers, sample_market_headers, monkeypatch
+):
+    job = sample_job(user=test_user, status="active")
+    sent: list[str] = []
+    monkeypatch.setattr(
+        "app.routers.jobs.send_job_status_changed_email",
+        lambda email, title, status, url: sent.append(email),
+    )
+
+    response = client.post(
+        f"/jobs/{job.id}/deactivate",
+        headers=auth_headers(test_user) | sample_market_headers("mz"),
+    )
+
+    assert response.status_code == 200
+    assert sent == []

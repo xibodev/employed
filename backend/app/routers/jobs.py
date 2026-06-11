@@ -16,6 +16,7 @@ from app.auth.dependencies import (
     get_user_id,
     is_admin_user,
     is_email_verified,
+    load_user_by_id,
 )
 from app.config import settings
 from app.database import get_db
@@ -557,9 +558,15 @@ def deactivate_job(
     set_attr(job, new_status, "status")
     set_attr(job, utcnow(), "updated_at", "updatedAt")
     saved = save(db, job)
-    owner_email = get_primary_email(current_user)
-    if owner_email and is_admin_user(current_user):
-        send_job_status_changed_email(
-            owner_email, get_attr(saved, "title", default="Job"), new_status, _build_job_url(request, saved)
-        )
+    # EMP-016: notify the JOB OWNER when someone else (an admin) deactivates
+    # their listing. Previously the email went to the acting admin instead.
+    owner_id = get_attr(saved, "user_id", "userId")
+    actor_id = get_user_id(current_user)
+    if owner_id is not None and owner_id != actor_id:
+        owner = load_user_by_id(db, owner_id)
+        owner_email = get_primary_email(owner) if owner is not None else None
+        if owner_email:
+            send_job_status_changed_email(
+                owner_email, get_attr(saved, "title", default="Job"), new_status, _build_job_url(request, saved)
+            )
     return _job_to_read(saved, request)
