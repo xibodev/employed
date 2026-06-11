@@ -255,3 +255,54 @@ def test_reset_password_with_garbage_token_returns_400(client):
     )
 
     assert response.status_code == 400
+
+
+def test_find_user_by_email_pushes_filter_to_database(db_session, user_factory):
+    """EMP-005 regression: user lookup must be a filtered SELECT, not a
+    full-table scan materialized into Python."""
+    from sqlalchemy import event
+
+    from app.routers.auth import _find_user_by_email
+
+    user_factory(email="indexed@example.com")
+    user_factory(email="someone-else@example.com")
+
+    statements: list[str] = []
+    engine = db_session.get_bind()
+
+    def record(conn, cursor, statement, parameters, context, executemany):
+        statements.append(statement)
+
+    event.listen(engine, "before_cursor_execute", record)
+    try:
+        found = _find_user_by_email(db_session, "Indexed@Example.com")
+    finally:
+        event.remove(engine, "before_cursor_execute", record)
+
+    assert found is not None
+    assert found.email == "indexed@example.com"
+    user_selects = [s for s in statements if s.lower().lstrip().startswith("select") and "users" in s.lower()]
+    assert user_selects, "expected at least one SELECT against users"
+    assert all("where" in s.lower() for s in user_selects), f"unfiltered users scan detected: {user_selects}"
+
+
+def test_find_user_by_email_misses_cleanly(db_session, user_factory):
+    from app.routers.auth import _find_user_by_email
+
+    user_factory(email="present@example.com")
+
+    assert _find_user_by_email(db_session, "absent@example.com") is None
+    assert _find_user_by_email(db_session, "") is None
+
+
+def test_find_user_by_provider_matches_oauth_providers_map(db_session, user_factory):
+    from app.routers.auth import _find_user_by_provider
+
+    user = user_factory(email="oauth-map@example.com", oauth_providers={"google": "sub-123"})
+    user_factory(email="oauth-other@example.com", oauth_providers={"google": "sub-456"})
+
+    found = _find_user_by_provider(db_session, "google", "sub-123")
+
+    assert found is not None
+    assert found.id == user.id
+    assert _find_user_by_provider(db_session, "google", "missing-sub") is None

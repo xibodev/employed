@@ -9,7 +9,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import RedirectResponse
 
-from app.auth.dependencies import get_primary_email, get_user_id, get_user_roles, is_email_verified
+from app.auth.dependencies import get_primary_email, get_user_id, get_user_roles, is_email_verified, load_user_by_id
 from app.auth.jwt import (
     create_password_reset_token,
     create_verification_token,
@@ -36,7 +36,7 @@ from app.schemas.auth import (
 )
 from app.schemas.users import UserRead
 from app.services.email import send_password_reset_email, send_registration_attempt_email, send_verification_email
-from app.services.model_utils import get_attr, query_all, resolve_model, save, set_attr, utcnow
+from app.services.model_utils import get_attr, get_model_field, query_all, resolve_model, save, set_attr, utcnow
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -133,9 +133,41 @@ def _user_to_read(user: Any) -> UserRead:
     )
 
 
+def _rollback_quietly(db: Any) -> None:
+    rollback = getattr(db, "rollback", None)
+    if callable(rollback):
+        try:
+            rollback()
+        except Exception:  # noqa: BLE001 — best-effort session recovery
+            pass
+
+
 def _find_user_by_email(db: Any, email: str):
-    normalized = email.strip().lower()
-    for user in query_all(db, _user_model()):
+    """Indexed equality lookup on users.email (EMP-005).
+
+    Previously iterated the whole users table in Python on every login /
+    register / forgot-password request. Emails are normalized to lowercase
+    on write; a case-insensitive fallback query covers legacy mixed-case
+    rows. The Python scan remains only for models without an email column.
+    """
+    normalized = (email or "").strip().lower()
+    if not normalized:
+        return None
+    model = _user_model()
+    email_field = get_model_field(model, "email")
+    if email_field is not None:
+        matches = query_all(db, model, filters=[email_field == normalized], limit=1)
+        if matches:
+            return matches[0]
+        try:
+            from sqlalchemy import func
+
+            matches = query_all(db, model, filters=[func.lower(email_field) == normalized], limit=1)
+        except Exception:  # noqa: BLE001 — dialect without lower() push-down
+            _rollback_quietly(db)
+            matches = []
+        return matches[0] if matches else None
+    for user in query_all(db, model):
         current = (get_primary_email(user) or "").strip().lower()
         if current == normalized:
             return user
@@ -145,7 +177,17 @@ def _find_user_by_email(db: Any, email: str):
 def _find_user_by_provider(db: Any, provider: str, provider_id: str | None):
     if not provider_id:
         return None
-    for user in query_all(db, _user_model()):
+    model = _user_model()
+    providers_field = get_model_field(model, "oauth_providers")
+    if providers_field is not None and hasattr(providers_field, "contains"):
+        # JSONB containment push-down (users.oauth_providers @> {provider: id})
+        try:
+            matches = query_all(db, model, filters=[providers_field.contains({provider: provider_id})], limit=1)
+            if matches:
+                return matches[0]
+        except Exception:  # noqa: BLE001 — non-JSONB dialect (e.g. SQLite tests)
+            _rollback_quietly(db)
+    for user in query_all(db, model):
         oauth_providers = get_attr(user, "oauth_providers", default={}) or {}
         if isinstance(oauth_providers, dict) and oauth_providers.get(provider) == provider_id:
             return user
@@ -173,9 +215,12 @@ def _set_local_user_fields(user: Any, email: str, name: str | None, password: st
 
 def _set_oauth_fields(user: Any, profile: dict) -> None:
     provider = profile["provider"]
-    set_attr(user, profile.get("email"), "email")
-    if hasattr(user, "emails") and profile.get("email"):
-        set_attr(user, [{"address": profile.get("email"), "verified": True}], "emails")
+    # Normalize on write so the indexed equality lookup in
+    # _find_user_by_email stays correct (EMP-005).
+    normalized_email = (profile.get("email") or "").strip().lower() or None
+    set_attr(user, normalized_email, "email")
+    if hasattr(user, "emails") and normalized_email:
+        set_attr(user, [{"address": normalized_email, "verified": True}], "emails")
     set_attr(user, profile.get("name"), "display_name", "name", "full_name", "username")
     set_attr(user, profile.get("provider_id"), f"{provider}_id", f"{provider}Id")
     set_attr(user, provider, "oauth_provider")
@@ -264,7 +309,7 @@ def refresh_token(payload: RefreshTokenRequest, db: Any = Depends(get_db)):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token") from exc
     if token.jti and is_revoked(token.jti):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Refresh token has been revoked")
-    user = next((item for item in query_all(db, _user_model()) if str(get_user_id(item)) == token.sub), None)
+    user = load_user_by_id(db, token.sub)
     if user is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
     try:
@@ -323,7 +368,7 @@ def verify_email(token: str, db: Any = Depends(get_db)):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or expired verification token"
         ) from exc
-    user = next((item for item in query_all(db, _user_model()) if str(get_user_id(item)) == payload.sub), None)
+    user = load_user_by_id(db, payload.sub)
     if user is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
     set_attr(user, True, "email_verified", "emailVerified")
@@ -364,7 +409,7 @@ def reset_password(token: str, payload: ResetPasswordRequest, db: Any = Depends(
         decoded = decode_password_reset_token(token)
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or expired reset token") from exc
-    user = next((item for item in query_all(db, _user_model()) if str(get_user_id(item)) == decoded.sub), None)
+    user = load_user_by_id(db, decoded.sub)
     if user is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
     try:
