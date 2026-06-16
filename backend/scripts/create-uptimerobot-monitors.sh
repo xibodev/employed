@@ -78,7 +78,7 @@ create_if_missing() {
     echo "[uptimerobot] ERROR: POST /v3/monitors failed: ${resp}" >&2
     return 1
   fi
-  echo "[uptimerobot] CREATED ${friendly_name} -> id=${new_id} (record this in docs/operations/uptime-robot.md)"
+  echo "[uptimerobot] CREATED ${friendly_name} -> id=${new_id} (record this in docs/operations/uptime-monitoring.md)"
 }
 
 failures=0
