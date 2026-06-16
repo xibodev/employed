@@ -1,7 +1,7 @@
 ---
-last_verified: 2026-06-11T01:31:02Z
-git_ref: fix/quality-run-2026-06-10 @ 5868453 (28 commits ahead of uat @ 00aa899)
-verified_by: quality run 2026-06-10_120309 — codebase cartography
+last_verified: 2026-06-14T00:00:00Z
+git_ref: working-tree (fix/quality-run-2026-06-10 lineage; uat baseline 00aa899)
+verified_by: codebase-cartographer — FP-CARTO-007 doc refresh (2026-06-14)
 ---
 
 # Repo Map — Employed
@@ -38,14 +38,14 @@ files under it — `git ls-files`); the real dependency roots are
 | `app/config.py` | Pydantic Settings — every env var the API reads (see CONFIG_AND_SECRETS_MAP.md) |
 | `app/database.py` | SQLAlchemy engine/session, declarative `Base` (UUID PK, created/updated timestamps) |
 | `app/logging_config.py` | Structured logging + request-id context |
-| `app/observability.py` | `init_sentry()` — no-op unless `SENTRY_DSN` set |
+| `app/observability.py` | `init_sentry()` — Sentry SDK wired but no-op unless `SENTRY_DSN` set; target DSN is Bugsink on Box 0 (see DEPENDENCY_MAP.md / CONFIG_AND_SECRETS_MAP.md) |
 | `app/middleware/market.py` | `MarketMiddleware` — market from `X-Forwarded-Host` (first value) falling back to `Host` (EMP-001) |
 | `app/middleware/rate_limit.py` | Redis fixed-window rate limiter with in-process fallback; trusted-proxy client-IP derivation (EMP-007/020) |
 | `app/auth/` | `jwt.py` (HS256 access/refresh tokens), `dependencies.py` (`get_current_user`, `require_admin`, …), `oauth.py` (Google), `passwords.py` (bcrypt), `revocation.py` (Redis JTI revocation) |
 | `app/routers/` | `auth`, `jobs`, `profiles`, `payments`, `reports`, `admin`, `users`, `public_api` (see API_MAP.md) |
 | `app/models/` | `user`, `job`, `profile`, `payment_intent`, `job_report`, `enums` (see DATA_MODEL.md) |
 | `app/schemas/` | Pydantic request/response models mirroring the routers |
-| `app/services/` | `email.py` (SMTP transactional mail), `market.py` (market registry), `html_sanitizer.py` (bleach), `model_utils.py` |
+| `app/services/` | `email.py` (SMTP transactional mail — current relay Resend; planned migration to AWS SES, see DEPENDENCY_MAP.md), `market.py` (market registry), `html_sanitizer.py` (bleach), `model_utils.py` |
 | `app/payments/` | Provider adapters: `stripe_adapter` (live), `mpesa_adapter` + `emola_adapter` (simulator-by-default), `settlement.py`, registry in `__init__.py` |
 | `app/webhooks/` | `stripe_webhook.py`, `mobile_money.py` (HMAC-SHA256 signature + mandatory timestamp), `replay_cache.py` (Redis dedupe, EMP-019) |
 | `app/workers/` | arq worker: `config.py` (`WorkerSettings`), `cron.py` (job expiry, account deletion), `tasks.py` |
@@ -87,9 +87,9 @@ files under it — `git ls-files`); the real dependency roots are
 - `deploy/docker-compose.prod.yml` — copied verbatim to Box 3 as the live
   compose file by `deploy-uat.yml`.
 - `frontend/src/lib/market.ts` / `src/app/robots.ts` / `src/app/sitemap.ts` —
-  domain derivation contract: no hardcoded domains (EMP-013/024, AI-OPS Rule 2).
-- `docs/decisions/001–004` — historical Meteor-era ADRs, superseded; keep as
-  archive context only.
+  domain derivation contract: no hardcoded domains (EMP-013/024).
+- `docs/archive/decisions/001–004` — historical Meteor-era ADRs, superseded;
+  retired to `docs/archive/` (reference only).
 
 ## Historical / archive material
 

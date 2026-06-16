@@ -1,7 +1,7 @@
 ---
-last_verified: 2026-06-11T04:50:00Z
-git_ref: fix/quality-run-2026-06-10 (uat baseline 00aa899)
-verified_by: quality run 2026-06-10_120309 — cartography + fix-executor follow-up
+last_verified: 2026-06-14T00:00:00Z
+git_ref: working-tree (fix/quality-run-2026-06-10 lineage; uat baseline 00aa899)
+verified_by: codebase-cartographer — FP-CARTO-007 doc refresh (2026-06-14)
 ---
 
 # Deployment Topology — Employed
@@ -18,11 +18,12 @@ defined on this branch** — the branch is not yet deployed.
 |-----|-------|--------------|--------|
 | Local dev | dev machine | `deploy/docker-compose.yml` (+ `docker-compose.dev.yml` overlay: live-reload mounts, PG on 3302, Redis on 3303) | builds from source |
 | Local test/UAT-mirror | dev machine | base + `docker-compose.test.yml` overlay (adds MailHog 3310 UI / 3311 SMTP, exposes PG/Redis) | used by quality runs |
-| UAT | Box 3 (Contabo VPS, `ubuntu@109.123.241.71`), `/opt/employed/` | `deploy/docker-compose.prod.yml` copied to `/opt/employed/docker-compose.yml` | LIVE (uat branch images) |
+| UAT | Box 3 (Contabo VPS), `/opt/employed/` | `deploy/docker-compose.prod.yml` copied to `/opt/employed/docker-compose.yml` | LIVE (uat branch images) |
 | Production | — | — | does not exist yet; `.mz` brand domain unrouted |
 
-Local host-port block (BOXES.md allocation, governs local/UAT): frontend
-**3300**, backend **3301**, postgres 3302, redis 3303, MailHog 3310/3311.
+Local host-port block (Box 3 allocation, governs local/UAT; see
+`docs/operations/INFRASTRUCTURE.md`): frontend **3300**, backend **3301**,
+postgres 3302, redis 3303, MailHog 3310/3311.
 
 ## Compose service graph (prod file, identical shape locally)
 
@@ -92,8 +93,11 @@ GitHub secrets consumed by deploy (names only): `BOX3_HOST`, `BOX3_SSH_KEY`,
 `EMPLOYED_UAT_DB_PASSWORD`, `EMPLOYED_UAT_SECRET_KEY`, `EMPLOYED_UAT_IP_SALT`,
 `EMPLOYED_UAT_STRIPE_SK/_WH_SECRET/_PK`,
 `EMPLOYED_UAT_RECAPTCHA_SITE_KEY/_SECRET_KEY`,
-`EMPLOYED_UAT_GOOGLE_CLIENT_ID/_SECRET`, `EMPLOYED_UAT_RESEND_API_KEY`,
-plus optional `EMPLOYED_UAT_SENTRY_DSN` (absent → empty → Sentry no-op).
+`EMPLOYED_UAT_GOOGLE_CLIENT_ID/_SECRET`, `EMPLOYED_UAT_RESEND_API_KEY`
+(current email relay; target is SES SMTP creds once `employed.xibodev.com` is
+SES-verified — planned), plus optional `EMPLOYED_UAT_SENTRY_DSN` (absent →
+empty → Sentry no-op; the target value when set is a **Bugsink DSN on Box 0**,
+not a Sentry SaaS DSN — planned, pending provisioning).
 
 ## Deploy-time env gaps (observed against this branch's code)
 
@@ -123,9 +127,27 @@ first post-merge deploy run.
   clears rate-limit counters, lockouts, revoked JTIs and replay-dedupe keys;
   all are TTL-bounded by design.
 
+## Cross-box / external dependencies (planned)
+
+Beyond Box 3's in-compose Postgres/Redis, two portfolio-standard external
+dependencies are **planned/target state** — not yet wired into this repo or
+the Box 3 deploy. They are config-level, not topology rewrites:
+
+| Dependency | Where | Role | Status |
+|------------|-------|------|--------|
+| **Bugsink** (error tracking) | **Box 0** — `https://errors.xibodev.com`, stack `xibodev-atlas/box0/` | Sentry-SDK-compatible error sink; Box 3 backend/worker/frontend would emit to a Bugsink DSN (projects `employed-api`, `employed-web`/`employed-uat`, team `xibodev`). Portfolio standard since 2026-06-11. | **planned — pending DSN provisioning**; SDK already wired, DSN-only change. Source: `docs/operations/INFRASTRUCTURE.md` (Error tracking) |
+| **AWS SES** (transactional email) | AWS **eu-west-1** (default region) | Outbound SMTP relay for verification/reset/job-lifecycle mail, replacing Resend. Config-level swap (SMTP creds + sender domain). Target sender `noreply@employed.xibodev.com` after DKIM verification; fall back to `noreply@xibodev.com` (Resend apex) until verified. Employed is on the priority SES bulk-verify list. | **planned — pending SES domain verification.** Source: `docs/operations/INFRASTRUCTURE.md` (Email — transactional) |
+
+These do not change the Box 3 compose graph or Caddy ingress; they alter only
+the `SENTRY_DSN` and SMTP/sender env values (see CONFIG_AND_SECRETS_MAP.md).
+
 ## Monitoring (live UAT)
 
 - UptimeRobot: frontend monitor (`employed.xibodev.com`) and API monitor
   (`https://api.employed.xibodev.com/health`), 5-min interval — both UP per
-  `SERVICES.md` / `docs/operations/uptime-robot.md`.
-- Sentry / New Relic: not provisioned yet (operator TODO).
+  `SERVICES.md` / `docs/operations/uptime-monitoring.md`. (Portfolio uptime standard
+  has moved to **Gatus on Box 0** since 2026-06-10; not yet wired here.)
+- Error tracking: Sentry SDK wired both ends but **no DSN set** (dormant). The
+  target is a **Bugsink DSN on Box 0** (see Cross-box dependencies above) —
+  planned, pending DSN provisioning. Do not stand up a new Sentry SaaS project.
+- New Relic (APM): not provisioned yet (portfolio-wide TODO).

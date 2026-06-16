@@ -1,16 +1,16 @@
 ---
-last_verified: 2026-06-11T04:50:00Z
-git_ref: fix/quality-run-2026-06-10 (uat baseline 00aa899)
-verified_by: quality run 2026-06-10_120309 — cartography + fix-executor follow-up
+last_verified: 2026-06-14T00:00:00Z
+git_ref: working-tree (fix/quality-run-2026-06-10 lineage; uat baseline 00aa899)
+verified_by: codebase-cartographer — FP-CARTO-007 doc refresh (2026-06-14)
 ---
 
 # Config & Secrets Map — Employed
 
 Env var **names and consumers only — never values.** Secret values resolve
 from GitHub Actions secrets or the Box 3 `/opt/employed/.env` (chmod 600);
-see `_integrations/CREDENTIALS.md` for the portfolio policy.
+see `docs/operations/INFRASTRUCTURE.md` for the portfolio policy.
 
-Principle (AI-OPS Rule 11, enforced by EMP-012/013/024): mutable values are
+Principle (runtime config, enforced by EMP-012/013/024): mutable values are
 runtime config. Backend reads everything through `backend/app/config.py`
 (pydantic-settings, `.env` file support, case-insensitive). Frontend
 `NEXT_PUBLIC_*` values are served per-request via `window.__ENV`
@@ -54,12 +54,26 @@ runtime config. Backend reads everything through `backend/app/config.py`
 
 ## Backend — email
 
+> **Planned migration — Resend → AWS SES (config-level, not in code yet).**
+> The SMTP vars below currently point at **Resend** (password = Resend API
+> key, apex `xibodev.com` sender). The portfolio standard / target is **AWS
+> SES (eu-west-1 default)** — the same backend Resend wraps, so the swap is
+> the same `SMTP_*` vars repointed at SES SMTP endpoints + a sender-domain
+> change, not a code change. **Target `FROM_EMAIL` = `noreply@employed.xibodev.com`**
+> once `employed.xibodev.com` is DKIM-verified on SES; **until verified the
+> product MUST fall back to `noreply@xibodev.com`** (apex, already on Resend)
+> or mail bounces. Employed is on the priority SES bulk-verify list
+> (`equilibria`/`kumbuka`/`nagare`/`employed`). **Status: pending SES domain
+> verification.** Source: `docs/operations/INFRASTRUCTURE.md` (Email —
+> transactional). SES SMTP credential *values* live in GH
+> secrets / Box 3 `.env`, never in this repo.
+
 | Var | Default | Consumer | Secret? |
 |-----|---------|----------|---------|
-| `SMTP_HOST` / `SMTP_PORT` | unset / 587 | `app/services/email.py` (no-op when unset) | no |
-| `SMTP_USERNAME` / `SMTP_PASSWORD` | unset | Resend relay auth (password = Resend API key) | **yes** (password) |
+| `SMTP_HOST` / `SMTP_PORT` | unset / 587 | `app/services/email.py` (no-op when unset). **CURRENT:** Resend SMTP host. **TARGET:** SES SMTP endpoint (eu-west-1) — planned | no |
+| `SMTP_USERNAME` / `SMTP_PASSWORD` | unset | relay auth. **CURRENT:** Resend (password = Resend API key). **TARGET:** SES SMTP user/password — planned | **yes** (password) |
 | `SMTP_USE_TLS` / `SMTP_USE_SSL` | false / false | UAT uses SSL :465 | no |
-| `FROM_EMAIL` | unset | sender identity | no |
+| `FROM_EMAIL` | unset | sender identity. **CURRENT:** `noreply@xibodev.com` (apex, Resend). **TARGET:** `noreply@employed.xibodev.com` once SES-DKIM-verified, else fall back to the apex — planned | no |
 | `ADMIN_EMAIL` | — | deploy env only (notification target) | no |
 | `FRONTEND_BASE_URL` → `APP_BASE_URL` → request base URL | — | email link base: `/verify-email/{token}`, `/reset-password/{token}` land on the **frontend** (EMP-004) | no |
 
@@ -75,10 +89,22 @@ runtime config. Backend reads everything through `backend/app/config.py`
 
 ## Backend — observability
 
+> **Planned migration — Sentry → Bugsink on Box 0 (DSN-only, not in code yet).**
+> The SDK is wired both ends but **no DSN is set** (no-op). The portfolio
+> error-tracking standard since 2026-06-11 is **Bugsink self-hosted on Box 0**
+> (`https://errors.xibodev.com`, stack `xibodev-atlas/box0/`), which is
+> Sentry-SDK compatible. **When `SENTRY_DSN` is finally set its value MUST be a
+> Bugsink DSN** — backend project `employed-api`, frontend project
+> `employed-web`/`employed-uat`, team `xibodev` — **never a new Sentry SaaS
+> project** (legacy org `nmtss` is read-only for old events). **Status:
+> pending DSN provisioning.** Source: `docs/operations/INFRASTRUCTURE.md` (Error
+> tracking). DSN *value* lives in the `EMPLOYED_UAT_SENTRY_DSN` GH secret /
+> Box 3 `.env`, never in this repo.
+
 | Var | Default | Consumer | Secret? |
 |-----|---------|----------|---------|
-| `SENTRY_DSN` | unset → no-op | `init_sentry()` | treat as sensitive |
-| `SENTRY_ENVIRONMENT` | `uat` (when DSN set) | Sentry env tag | no |
+| `SENTRY_DSN` (frontend: `NEXT_PUBLIC_SENTRY_DSN`) | unset → no-op | `init_sentry()` (backend) + `@sentry/nextjs` (frontend). **CURRENT:** unset. **TARGET:** a Bugsink DSN on Box 0 — planned, pending provisioning | treat as sensitive |
+| `SENTRY_ENVIRONMENT` | `uat` (when DSN set) | error-tracking env tag (Sentry SDK / Bugsink) | no |
 | `SENTRY_TRACES_SAMPLE_RATE` | 0.1 | tracing sample | no |
 
 ## Frontend
@@ -109,3 +135,11 @@ no-op) and `SENTRY_ENVIRONMENT=uat`. Takes effect on the first post-merge
 deploy. Remaining deliberate gap: `TRUSTED_PROXY_IPS` is not upserted — the
 loopback/RFC1918 default is correct for Box 3 Caddy-on-localhost. See
 DEPLOYMENT_TOPOLOGY.md "Deploy-time env gaps".
+
+**Planned migrations (target state, not in code yet):** when
+`EMPLOYED_UAT_SENTRY_DSN` is eventually populated, its value must be a
+**Bugsink DSN on Box 0** (not a Sentry SaaS DSN). And the `SMTP_*`/`FROM_EMAIL`
+values are slated to move from Resend to **AWS SES (eu-west-1)** with sender
+`noreply@employed.xibodev.com` (Resend apex fallback until SES-verified). Both
+are config-level swaps — see the per-section notes above and
+`docs/operations/INFRASTRUCTURE.md`.

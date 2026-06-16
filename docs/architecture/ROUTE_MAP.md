@@ -1,7 +1,7 @@
 ---
-last_verified: 2026-06-11T01:31:02Z
-git_ref: fix/quality-run-2026-06-10 @ 5868453 (28 commits ahead of uat @ 00aa899)
-verified_by: quality run 2026-06-10_120309 — codebase cartography
+last_verified: 2026-06-14T00:00:00Z
+git_ref: working-tree (fix/quality-run-2026-06-10 lineage; uat baseline 00aa899)
+verified_by: codebase-cartographer — FP-CARTO-007 doc refresh (2026-06-14)
 ---
 
 # Route Map — Employed frontend (Next.js App Router)

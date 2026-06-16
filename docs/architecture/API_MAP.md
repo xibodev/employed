@@ -1,7 +1,7 @@
 ---
-last_verified: 2026-06-11T01:31:02Z
-git_ref: fix/quality-run-2026-06-10 @ 5868453 (28 commits ahead of uat @ 00aa899)
-verified_by: quality run 2026-06-10_120309 — codebase cartography
+last_verified: 2026-06-14T00:00:00Z
+git_ref: working-tree (fix/quality-run-2026-06-10 lineage; uat baseline 00aa899)
+verified_by: codebase-cartographer — FP-CARTO-007 doc refresh (2026-06-14)
 ---
 
 # API Map — Employed backend
@@ -94,7 +94,7 @@ Market-scoped via `MarketMiddleware` (X-Forwarded-Host → Host).
 |--------|------|------|-----------|-------|
 | GET | `/users/me` | user | — | Returns snake_case `email_verified` (frontend reads it since EMP-029) |
 | GET | `/users/me/export` | user | 5/3600 s | Data export (user + jobs + profile + intents + reports) |
-| POST | `/users/me/resend-verification` | user | — | |
+| POST | `/users/me/resend-verification` | user | — | **Observed defect (CARTO-EMP-003):** builds the verify link against the API `request.base_url` (POST-only `/auth/verify-email/{token}`) instead of `FRONTEND_BASE_URL` + the frontend `/verify-email/{token}` page — so a resent link 405s on click, the way the register link did pre-EMP-004. Backend fix tracked as FP-CARTO-003 (out of cartographer scope) |
 | POST | `/users/me/request-deletion` | user | — | Schedules deletion at now+30 d; worker cron hard-deletes |
 | POST | `/users/me/cancel-deletion` | user | — | |
 

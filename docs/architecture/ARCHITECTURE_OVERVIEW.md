@@ -1,7 +1,7 @@
 ---
-last_verified: 2026-06-11T01:31:02Z
-git_ref: fix/quality-run-2026-06-10 @ 5868453 (28 commits ahead of uat @ 00aa899)
-verified_by: quality run 2026-06-10_120309 — codebase cartography
+last_verified: 2026-06-14T00:00:00Z
+git_ref: working-tree (fix/quality-run-2026-06-10 lineage; uat baseline 00aa899)
+verified_by: codebase-cartographer — FP-CARTO-007 doc refresh (2026-06-14)
 ---
 
 # Architecture Overview — Employed
@@ -131,7 +131,9 @@ Source: `backend/app/routers/auth.py`, `backend/app/auth/`,
 - Transactional email on submission, status change, and admin deactivation
   (owner notified, not the acting admin — EMP-016). Email links point at
   **frontend** pages built from `FRONTEND_BASE_URL`/`APP_BASE_URL`
-  (EMP-004).
+  (EMP-004). Current relay is **Resend SMTP** via the `xibodev.com` apex
+  sender; the portfolio standard (and planned target) is **AWS SES** — see
+  the External services narrative below.
 
 ## Payments
 
@@ -160,7 +162,7 @@ Source: `backend/app/routers/payments.py`, `backend/app/payments/`,
 - Next.js 15 App Router, React 19, server components by default; standalone
   output. SSR fetches rewrite `localhost` API URLs to the compose-internal
   `http://backend:8000` (`src/lib/api.ts`).
-- **Runtime config (EMP-012, Rule 11)**: `NEXT_PUBLIC_API_URL` and
+- **Runtime config (EMP-012)**: `NEXT_PUBLIC_API_URL` and
   `NEXT_PUBLIC_RECAPTCHA_SITE_KEY` resolve at request time via a per-request
   `window.__ENV` script (`RuntimeEnvScript`) with build-time inlining only as
   fallback — changing them is a container restart, not a rebuild.
@@ -189,12 +191,44 @@ the inherited HTTP one.
 
 ## Observability
 
-- Sentry: backend `init_sentry()` (FastAPI+SQLAlchemy integrations) and
-  frontend `@sentry/nextjs` configs — both no-op until `SENTRY_DSN` is set
-  (projects not provisioned yet; operator action from the 2026-06-10 run).
+- Error tracking (CURRENT): the **Sentry SDK is wired both ends** — backend
+  `init_sentry()` (FastAPI+SQLAlchemy integrations) and frontend
+  `@sentry/nextjs` configs — but both are **no-op until `SENTRY_DSN` is set**.
+  No DSN is set today, so error capture is effectively dormant.
+- Error tracking (PLANNED — pending DSN provisioning): the portfolio
+  error-tracking standard since 2026-06-11 is **Bugsink self-hosted on Box 0**
+  (`https://errors.xibodev.com`, stack at `xibodev-atlas/box0/`), which is
+  Sentry-SDK compatible. When a DSN is finally provisioned it MUST be a
+  **Bugsink** DSN — project `employed-api` (backend) and
+  `employed-web` / `employed-uat` (frontend), team `xibodev` — never a new
+  Sentry SaaS project. The legacy Sentry SaaS org `nmtss` is kept read-only
+  for old events only. Source: `docs/operations/INFRASTRUCTURE.md` (Error
+  tracking). Status: SDK code unchanged, DSN swap only.
 - Health: API `/health` (GET+HEAD, DB+Redis), frontend `/api/health`
-  (static ok). UptimeRobot monitors both (see `docs/operations/uptime-robot.md`).
+  (static ok). UptimeRobot monitors both today (external; the portfolio
+  standard is moving to Gatus on Box 0 per `docs/operations/INFRASTRUCTURE.md`,
+  not yet wired here — see `docs/operations/uptime-monitoring.md`).
 - Structured logs with request IDs (`backend/app/logging_config.py`).
+
+## External services (current vs planned)
+
+Two portfolio-standard migrations are **planned/target state**, not yet
+reflected in this source tree. The code still uses Resend + the Sentry SDK
+(no DSN), so neither swap is complete:
+
+- **Transactional email — Resend → AWS SES (planned).** Current code
+  (`backend/app/services/email.py`) sends over **Resend SMTP** using the
+  verified `xibodev.com` apex sender. The portfolio standard is **AWS SES**
+  (eu-west-1 default); because SES is the same backend Resend wraps, this is a
+  config-level swap (SMTP creds + sender domain), not a code rewrite. Employed
+  is on the **priority SES bulk-verify list** (`equilibria`, `kumbuka`,
+  `nagare`, `employed`). Target sender = `noreply@employed.xibodev.com` once
+  `employed.xibodev.com` is DKIM-verified on SES; until verified the product
+  MUST fall back to `noreply@xibodev.com` (apex, already on Resend) or mail
+  bounces. Status: pending SES domain verification. Source:
+  `docs/operations/INFRASTRUCTURE.md` (Email — transactional).
+- **Error tracking — Sentry → Bugsink on Box 0 (planned).** Covered in
+  Observability above. Status: pending DSN provisioning.
 
 ## Trust boundaries
 
