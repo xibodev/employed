@@ -21,6 +21,13 @@
       green (no more false-negative); and the EMP fixes are live — admin reports
       no longer 500, anonymous job posting works, verify/reset email links open
       (no 405), and `mx.*` serves MX data (X-Forwarded-Host).
+- [ ] **CI is red on the release (`e168f8b`)** — pre-existing on the branch, not
+      gated on deploy. Fix before promoting toward prod:
+      - `backend-test`: 8 failures in `backend/tests/test_public_api.py` — the
+        Redis rate-limiter returns `429` to the test client (test isolation:
+        reset/disable the limiter per-test or flush Redis between tests) plus a
+        `KeyError: 'items'` in the query-filter parity test.
+      - `backend-lint`: `ruff format backend/tests/test_auth.py` (1 file).
 
 ## 🟡 Operator — infra / credentials
 
