@@ -105,9 +105,9 @@ re-seeded sealed Docker stack (`fix-execution/execution-report.json`).
   catalogs key-set-synced at 263 keys per locale (`a61af61`, EMP-027).
 - All market/robots/sitemap/canonical domains derive from
   `NEXT_PUBLIC_APP_URL`; zero hardcoded domains left in `frontend/src`
-  (`a7d1cef`, EMP-013+024 — Rule 2).
+  (`a7d1cef`, EMP-013+024).
 - API URL + reCAPTCHA site key become runtime config (`window.__ENV` injection)
-  — config changes are a restart, not a rebuild (`7982049`, EMP-012 — Rule 11).
+  — config changes are a restart, not a rebuild (`7982049`, EMP-012).
 
 ### Build / test infrastructure
 

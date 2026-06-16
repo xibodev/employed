@@ -74,7 +74,7 @@ Translation catalogs live in `frontend/messages/` as JSON files keyed by locale 
 
 Adding a translation is a three-file change — add the key to all three locale files.
 
-Locale codes used throughout: `en`, `pt`, `es` (STANDARDS §4 — no extended tags like `pt-MZ`).
+Locale codes used throughout: `en`, `pt`, `es` (no extended tags like `pt-MZ`).
 
 Known residuals (EMP-027): API-origin error strings remain English; job-type/currency/period option labels stay canonical API values; admin UI copy is English-only.
 

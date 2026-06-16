@@ -7,9 +7,9 @@ verified_by: doc-drift audit, quality run 2026-06-10_120309
 # Operations Runbook
 
 > Incident response, log triage, and operational procedures for Employed.
-> Stack: FastAPI + Next.js 15 · PostgreSQL 16 · Redis 7 · Docker Compose · Box 3 (`109.123.241.71`)
+> Stack: FastAPI + Next.js 15 · PostgreSQL 16 · Redis 7 · Docker Compose · Box 3
 >
-> URLs below are the **current UAT** hostnames (env-derived domain — Rule 2).
+> URLs below are the **current UAT** hostnames (env-derived domain, never hardcoded).
 
 ---
 
@@ -38,7 +38,7 @@ curl -fsS https://employed.xibodev.com/api/health
 ### On Box 3 (SSH)
 
 ```bash
-ssh ubuntu@109.123.241.71
+ssh ubuntu@$BOX3_HOST   # Box 3 IP from local SSH config / GH secret BOX3_HOST
 cd /opt/employed
 docker compose ps               # all services running?
 docker compose logs --tail=50 backend
@@ -96,7 +96,7 @@ docker compose logs --since=30m
 ### P1 — App is down
 
 1. **Verify:** `curl https://api.employed.xibodev.com/health`
-2. **SSH to Box 3:** `ssh ubuntu@109.123.241.71`
+2. **SSH to Box 3:** `ssh ubuntu@$BOX3_HOST   # Box 3 IP from local SSH config / GH secret BOX3_HOST`
 3. **Check containers:** `cd /opt/employed && docker compose ps`
 4. **Check logs:** `docker compose logs --tail=100 backend`
 5. **Restart backend:** `docker compose restart backend`
@@ -143,7 +143,7 @@ Monitor at: `gh run list --repo mekjr1/employed.co.mz`
 The previous image is still in GHCR. To rollback:
 
 ```bash
-ssh ubuntu@109.123.241.71
+ssh ubuntu@$BOX3_HOST   # Box 3 IP from local SSH config / GH secret BOX3_HOST
 cd /opt/employed
 
 # Pull the previous image tag (or use a specific digest)
@@ -163,7 +163,7 @@ git revert HEAD && git push origin uat
 ### Manual deploy (emergency, no CI)
 
 ```bash
-ssh ubuntu@109.123.241.71
+ssh ubuntu@$BOX3_HOST   # Box 3 IP from local SSH config / GH secret BOX3_HOST
 cd /opt/employed
 docker compose pull
 docker compose up -d --remove-orphans
@@ -191,7 +191,7 @@ Secrets live in `/opt/employed/.env` (chmod 600). They are written by the deploy
 To inspect a secret on Box 3 (without revealing the value):
 
 ```bash
-ssh ubuntu@109.123.241.71
+ssh ubuntu@$BOX3_HOST   # Box 3 IP from local SSH config / GH secret BOX3_HOST
 grep "^STRIPE_SECRET_KEY=" /opt/employed/.env | cut -c1-30
 ```
 

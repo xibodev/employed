@@ -1,4 +1,4 @@
-<!-- last_verified: 2026-06-11T02:02:49Z | git_ref: fix/quality-run-2026-06-10 | verified_by: doc-drift audit, quality run 2026-06-10_120309 -->
+<!-- last_verified: 2026-06-15T00:00:00Z | git_ref: fix/quality-run-2026-06-10 | verified_by: self-contained cleanse 2026-06-15 -->
 
 # Employed
 
@@ -49,6 +49,7 @@ The product supports English, Spanish, and Portuguese. Each market has a default
 | --- | --- |
 | [`CLAUDE.md`](CLAUDE.md) | Current architecture notes for FastAPI + Next.js |
 | [`DEPLOY.md`](DEPLOY.md) | Deployment topology and procedures (Box 3 UAT) |
+| [`docs/operations/INFRASTRUCTURE.md`](docs/operations/INFRASTRUCTURE.md) | Self-contained infra context: box, port block, domains, error/email/uptime standards, secrets boundary |
 | [`docs/architecture/`](docs/architecture/) | Observed-state architecture bundle (API map, routes, data model, config map, deployment topology) |
 | [`docs/product/`](docs/product/) | Feature registry, backlog, known limitations, release notes |
 | [`docs/api-reference.md`](docs/api-reference.md) | API documentation |
@@ -56,8 +57,8 @@ The product supports English, Spanish, and Portuguese. Each market has a default
 | [`docs/markets-and-locales.md`](docs/markets-and-locales.md) | Market and locale behaviour |
 | [`docs/operations-runbook.md`](docs/operations-runbook.md) | Incident response and operational procedures |
 | [`docs/settings-reference.md`](docs/settings-reference.md) | Environment variable reference |
-| [`docs/decisions/`](docs/decisions/) | Architecture Decision Records (001–004 are superseded Meteor-era decisions) |
-| [`MIGRATION-PLAN.md`](MIGRATION-PLAN.md) | Historical Meteor → FastAPI/Next.js migration plan |
+| [`docs/decisions/`](docs/decisions/) | Architecture Decision Records (current: `005`, `006`) |
+| [`docs/archive/`](docs/archive/) | Retired Meteor-era docs (migration plan, redesign, ADRs 001–004) — reference only |
 | [`brand/`](brand/) | Brand kit assets |
 
 ## Testing
@@ -71,4 +72,4 @@ npx playwright test tests/e2e/
 
 ## History
 
-This project started as a fork of `nate-strauser/wework` and has since been migrated away from Meteor. Historical migration documents are kept in the repo where they still provide context.
+This project started as a fork of `nate-strauser/wework` and has since been migrated away from Meteor. Historical migration documents are retired to [`docs/archive/`](docs/archive/) for reference.

@@ -1,12 +1,10 @@
-<!-- last_verified: 2026-06-11T02:02:49Z | git_ref: fix/quality-run-2026-06-10 (uat baseline 00aa899) | verified_by: doc-drift audit, quality run 2026-06-10_120309 -->
+<!-- last_verified: 2026-06-15T00:00:00Z | git_ref: fix/quality-run-2026-06-10 (uat baseline 00aa899) | verified_by: self-contained cleanse 2026-06-15 -->
 
-# Employed — `SERVICES.md` (in-repo copy)
+# Employed — `SERVICES.md`
 
-> The **canonical** live-state copy lives at the wrapper level:
-> `E:\startup projects\employed.co.mz\SERVICES.md` (outside this git repo).
-> This in-repo copy is kept in sync for repo-local reference; if they
-> disagree, trust the wrapper copy. Conforms to the per-product doc shape
-> locked 2026-05-27 (see `00-DECISIONS-LOCKED.md` §9).
+> **Canonical live-state doc for this product.** Self-contained: no external
+> copy and no parent-folder dependency. Infrastructure facts and portfolio
+> conventions are captured in `docs/operations/INFRASTRUCTURE.md`.
 
 ---
 
@@ -16,12 +14,12 @@
 Multilingual job board for Mozambique and Mexico. Companies post jobs, candidates browse localized listings, and admins moderate listings before they go live.
 
 ## Repos
-| Surface | Repo | Local folder |
+| Surface | Repo | Path in repo |
 |---------|------|--------------|
-| Product monorepo | [`mekjr1/employed.co.mz`](https://github.com/mekjr1/employed.co.mz) | `E:\startup projects\employed.co.mz\employed.co.mz\` |
-| Backend API | same repo — `backend/` | `E:\startup projects\employed.co.mz\employed.co.mz\backend\` |
-| Frontend | same repo — `frontend/` | `E:\startup projects\employed.co.mz\employed.co.mz\frontend\` |
-| Deployment | same repo — `deploy/` + `.github/workflows/` | `E:\startup projects\employed.co.mz\employed.co.mz\deploy\` |
+| Product monorepo | [`mekjr1/employed.co.mz`](https://github.com/mekjr1/employed.co.mz) | repo root |
+| Backend API | same repo | `backend/` |
+| Frontend | same repo | `frontend/` |
+| Deployment | same repo | `deploy/` + `.github/workflows/` |
 
 Repo/folder slug `employed.co.mz` is retained. Live infrastructure uses the shorter brand slug `employed` for `/opt/employed/`, GHCR images, and observability resource names.
 
@@ -39,8 +37,8 @@ Repo/folder slug `employed.co.mz` is retained. Live infrastructure uses the shor
 | Email | 🟡 **WORKING VIA APEX, BROKEN LINKS.** Resend SMTP via verified `xibodev.com` delivers, but the deployed build's verification/reset links target the API host and 405 on click (EMP-004 — fixed on the pending branch, which links via `FRONTEND_BASE_URL`). |
 | Anonymous job posting | 🔴 **BROKEN on live.** reCAPTCHA secret resolution + action mismatch make anonymous posting always fail (EMP-002/003 — fixed on the pending branch). |
 | Admin moderation | 🔴 **BROKEN on live when reports exist.** `GET /admin/reports` 500s and blanks the admin UI (EMP-026 — fixed on the pending branch). |
-| Sentry | 🟡 **WIRED, NOT PROVISIONED.** Backend `init_sentry()` and frontend `@sentry/nextjs` configs ship in the deployed build (no-op without DSN). No Employed Sentry project/DSN exists yet — provisioning + `SENTRY_DSN` env remain pending (EMP-011). |
-| UptimeRobot | 🟢 **LIVE.** Frontend monitor `employed.xibodev.com` (id `803170467`) UP; API monitor `employed-api-uat` (id `803177488`, `/health`) UP. See `docs/operations/uptime-robot.md`. |
+| Error tracking | 🟡 **WIRED, NOT PROVISIONED.** Backend `init_sentry()` and frontend `@sentry/nextjs` configs ship in the deployed build (no-op without DSN). No DSN exists yet. **Target = Bugsink on Box 0** (`errors.xibodev.com`), projects `employed-api` / `employed-web` — a DSN-only swap (EMP-011). See `docs/operations/bugsink-setup.md`. |
+| Uptime | 🟢 **LIVE (UptimeRobot, legacy).** Frontend monitor `employed.xibodev.com` (id `803170467`) UP; API monitor `employed-api-uat` (id `803177488`, `/health`) UP. **Portfolio standard is now Gatus on Box 0** — migration pending. See `docs/operations/uptime-monitoring.md`. |
 
 ### Pending release — branch `fix/quality-run-2026-06-10` (NOT deployed)
 
@@ -63,7 +61,7 @@ deploy. Full detail: `docs/product/RELEASE_NOTES.md`.
 ### Backend (Box 3)
 | | |
 |---|---|
-| Host | `ubuntu@109.123.241.71` (Contabo VPS 20, Box 3) |
+| Host | Box 3 (Contabo VPS) — `ubuntu@$BOX3_HOST` (IP in local SSH config / GH secret `BOX3_HOST`, never in-repo) |
 | Compose dir | `/opt/employed/` |
 | Compose file | `deploy/docker-compose.prod.yml` copied to `/opt/employed/docker-compose.yml` |
 | Image | `ghcr.io/mekjr1/employed-api:uat` |
@@ -105,8 +103,8 @@ deploy. Full detail: `docs/product/RELEASE_NOTES.md`.
 | Current verified sender | `Employed <noreply@xibodev.com>` |
 | Current relay | `smtp.resend.com:465`, SSL, username `resend` |
 | Env | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_USE_SSL`, `FROM_EMAIL` |
-| Resend reality | `xibodev.com` and `adsbridge.xibodev.com` verified; no Employed domain verified yet |
-| Target | Verify `employed.xibodev.com` in Resend, then switch to `noreply@employed.xibodev.com`; defer `employed.co.mz` sender until `.mz` DNS exists |
+| Current reality | Resend apex `xibodev.com` delivers; no Employed-specific sender domain verified yet |
+| Target | **AWS SES** (`eu-west-1`) is the portfolio email standard. Verify `employed.xibodev.com` on SES (DKIM), then switch `FROM_EMAIL` to `noreply@employed.xibodev.com`; until verified, fall back to the apex `noreply@xibodev.com` (Resend). Defer an `employed.co.mz` sender until `.mz` DNS exists. See `docs/operations/INFRASTRUCTURE.md`. |
 
 ### Authentication
 | | |
@@ -141,9 +139,9 @@ Facebook, GitHub, and Twitter OAuth env slots exist in examples, but those provi
 
 | Channel | Project / config |
 |---------|------------------|
-| Sentry | org `nmtss`. Target projects: `employed-api` + `employed-frontend`. **SDKs wired both ends** (backend `init_sentry()`; frontend `@sentry/nextjs` client/server/edge configs) — no-op until DSN set. **Projects/DSNs not provisioned yet** (EMP-011 operator TODO). |
+| Error tracking (Bugsink) | **Target = Bugsink on Box 0** (`https://errors.xibodev.com`), projects `employed-api` + `employed-web`, team `xibodev`. **SDKs wired both ends** (backend `init_sentry()`; frontend `@sentry/nextjs` client/server/edge configs) — no-op until DSN set. **DSN not provisioned yet** (EMP-011 operator TODO). Bugsink is Sentry-SDK compatible, so this is a DSN-only swap; the legacy Sentry SaaS org stays read-only. See `docs/operations/bugsink-setup.md`. |
 | New Relic | app name pattern `employed-api-uat`, `employed-frontend-uat`, optionally `employed-worker-uat`. **Agent not installed yet.** |
-| UptimeRobot | 🟢 LIVE — frontend monitor `employed.xibodev.com` (id `803170467`) and API monitor `employed-api-uat` (id `803177488`, `/health`), 5-min interval. See `docs/operations/uptime-robot.md`. |
+| Uptime | 🟢 LIVE on **UptimeRobot (legacy)** — frontend monitor `employed.xibodev.com` (id `803170467`) and API monitor `employed-api-uat` (id `803177488`, `/health`), 5-min interval. Portfolio standard is now **Gatus on Box 0** (migration pending). See `docs/operations/uptime-monitoring.md`. |
 | Loki / Grafana / Promtail | **NOT USED.** Retired with Box A. |
 | Health endpoints | API `/health` (GET + HEAD); frontend `/api/health`. No `/healthz` or `/metrics` endpoints exist. |
 
@@ -188,7 +186,7 @@ Facebook, GitHub, and Twitter OAuth env slots exist in examples, but those provi
 | `REDIS_URL` | `redis://redis:6379/0` | In-compose Redis on Box 3. |
 | `NEXT_PUBLIC_API_URL` | `https://api.employed.xibodev.com` | Live build: baked at image build. Pending branch: served at runtime via `window.__ENV` (build-arg only a fallback). |
 | `FRONTEND_BASE_URL` / `NEXT_PUBLIC_APP_URL` / `CORS_ORIGINS` / `ENVIRONMENT` | not yet set on Box 3 (upsert added on branch) | BL-001 resolved on branch 2026-06-11: `deploy-uat.yml` upserts all four (+ `SENTRY_*`); lands on Box 3 with the first post-merge deploy. |
-| `FROM_EMAIL` | `Employed <noreply@xibodev.com>` now | Switch to `noreply@employed.xibodev.com` after Resend verification. |
+| `FROM_EMAIL` | `Employed <noreply@xibodev.com>` now | Switch to `noreply@employed.xibodev.com` after SES DKIM verification (`eu-west-1`). |
 | `ADMIN_EMAIL` | `admin@employed.co.mz` | Current deploy value; verify mailbox/domain before relying on it. |
 | `SMTP_*` | Resend SMTP relay | UAT uses port `465` + SSL. |
 | `GOOGLE_CLIENT_ID/SECRET` | present in GH secrets | Google-only OAuth for now. |
@@ -204,10 +202,10 @@ Facebook, GitHub, and Twitter OAuth env slots exist in examples, but those provi
 
 0. ~~**NEW (hard pre-deploy gate, BL-001/BL-002):** extend the `deploy-uat.yml` env upsert with `FRONTEND_BASE_URL`, `NEXT_PUBLIC_APP_URL`, `CORS_ORIGINS`, `ENVIRONMENT`, `SENTRY_DSN`, `SENTRY_ENVIRONMENT`.~~ **DONE in repo 2026-06-11** — upsert block extended on the fix branch; takes effect on the first post-merge deploy (live box unchanged until then).
 1. ~~**Fix worker health status.**~~ **DONE in repo** — Redis-ping healthcheck committed in `deploy/docker-compose.prod.yml`; takes effect on the next deploy (live box still shows the false-negative until then).
-2. ~~**Create UptimeRobot monitors.**~~ **DONE 2026-05-29.** Frontend `803170467` and API `803177488` (`/health`) both LIVE. See `docs/operations/uptime-robot.md`.
-3. **Provision Sentry**: create `employed-api` + `employed-frontend` in org `nmtss` and set `SENTRY_DSN` + `SENTRY_ENVIRONMENT=uat` in the deploy env. (SDK wiring already done on both ends — backend `init_sentry()`, frontend `@sentry/nextjs`.)
+2. ~~**Create uptime monitors.**~~ **DONE 2026-05-29** (UptimeRobot `803170467` + `803177488`). **Follow-up:** migrate to the portfolio standard, **Gatus on Box 0**, then retire the UptimeRobot monitors. See `docs/operations/uptime-monitoring.md`.
+3. **Provision Bugsink**: create `employed-api` + `employed-web` projects in **Bugsink** (`errors.xibodev.com`, Box 0, team `xibodev`) and set `SENTRY_DSN` + `SENTRY_ENVIRONMENT=uat` in the deploy env. Bugsink is Sentry-SDK compatible, so the wired SDKs (backend `init_sentry()`, frontend `@sentry/nextjs`) need only the DSN. See `docs/operations/bugsink-setup.md`.
 4. **Install/configure New Relic** for API/frontend (and worker if supported); use brand/env app names above.
-5. **Verify `employed.xibodev.com` in Resend** and switch `FROM_EMAIL` after verification. Until then, keep `noreply@xibodev.com`.
+5. **Verify `employed.xibodev.com` on AWS SES** (`eu-west-1`, portfolio email standard) and switch `FROM_EMAIL` to `noreply@employed.xibodev.com` after DKIM verification. Until then, keep the apex `noreply@xibodev.com` (Resend) or mail bounces.
 6. **Resolve `.mz` domain ownership/delegation** before adding production-domain DNS or Caddy routes.
 7. **Align branch policy**: keep `uat` deploy branch, then rename `master` → `main` (CI already covers `master` and `uat`).
 8. **Confirm M-Pesa and e-Mola sandbox credentials** before mobile-money UAT journeys that claim real provider coverage. (Pending branch makes the callback timestamp mandatory — confirm providers send one.)
@@ -232,9 +230,10 @@ Facebook, GitHub, and Twitter OAuth env slots exist in examples, but those provi
 
 ---
 
-## Cross-links
+## Cross-links (all in-repo — this repo is self-contained)
 
-- Locked decisions: `_integrations/_archive/2026-05-27-DECISIONS-LOCKED.md` (this run)
-- Box / port allocation: `_integrations/BOXES.md`
-- External-service standards: `_integrations/DEPENDENCIES.md`
-- Slug ↔ brand ↔ repo map: `_integrations/DISAMBIGUATION.md`
+- Infrastructure, port block, domains, box, error/email/uptime standards, secrets boundary: `docs/operations/INFRASTRUCTURE.md`
+- Deployment procedure + rollback: `DEPLOY.md`
+- Full observed architecture: `docs/architecture/`
+- Error tracking setup: `docs/operations/bugsink-setup.md`
+- Uptime monitoring: `docs/operations/uptime-monitoring.md`

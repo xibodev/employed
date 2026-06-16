@@ -26,7 +26,7 @@ Deploy evidence for every `deployed_to_uat` row below: GitHub Actions deploy run
 **`26541953900`** (2026-05-27, `deploy-uat.yml`, success) + live HTTPS probes at
 **2026-06-11T01:44:01Z** (`api.employed.xibodev.com/health` 200 with db/redis ok;
 `employed.xibodev.com` 200; `mx.employed.xibodev.com` 200). Note: the product is
-**not yet Atlas-registered** (no `atlas.json`; AI-OPS Rule 8) — reachability was
+**not yet Atlas-registered** (no `atlas.json`) — reachability was
 verified by direct probe instead of an Atlas API record (finding BFS-005).
 
 | ID | Feature | Status | Last activity | Owner | Evidence / defects on the live build |
@@ -74,7 +74,7 @@ run exists.**
 | EMP-006 | Refresh JWT moved to httpOnly cookie (no localStorage) | `tested_locally` | 2026-06-10 `9b08eb2` | engineering | cookie-lifecycle tests; **operator prereq:** exact `CORS_ORIGINS` per env (BL-002) |
 | EMP-027 | Localize auth/account/my-jobs/job-detail/post-job (pt/es) | `tested_locally` | 2026-06-10 `a61af61` | engineering | catalog key-set sync (263 keys/locale) + build green; residuals → BL-015 |
 | EMP-013+024 | All market/robots/sitemap domains from `NEXT_PUBLIC_APP_URL` | `tested_locally` | 2026-06-10 `a7d1cef` | engineering | grep gate: zero hardcoded domains in `frontend/src` |
-| EMP-012 | Runtime config for API URL + reCAPTCHA site key (Rule 11) | `tested_locally` | 2026-06-10 `7982049` | engineering | tsc/eslint/build; restart-not-rebuild verified by compose design |
+| EMP-012 | Runtime config for API URL + reCAPTCHA site key | `tested_locally` | 2026-06-10 `7982049` | engineering | tsc/eslint/build; restart-not-rebuild verified by compose design |
 | EMP-015 | Admin user search (find non-admins to promote) | `tested_locally` | 2026-06-10 `7bb648d` | engineering | 3 search regression tests |
 | EMP-010 | `/jobs` search/filter/pagination/count pushed into SQL | `tested_locally` | 2026-06-10 `b14a3c2` | engineering | SQL-shape + parity tests; public aliases covered by the follow-up CARTO-001 row below |
 | CARTO-001 | Public aliases `/api/jobs` + `/api/featuredJobs` on the EMP-010 SQL pushdown | `tested_locally` | 2026-06-11 (this pass) | engineering | Shared `_job_query_pushdown` reuse; parity (market/active/90-day/order/featured) + SQL-shape (LIMIT/COUNT) tests in `tests/test_public_api.py`; closes BL-006 / KL-10 on branch |
@@ -85,7 +85,7 @@ run exists.**
 | EMP-021 | Pinned backend requirements; migration/test deps out of image | `tested_locally` | 2026-06-10 `5ed6f95` | engineering | local image build: pins resolve, pymongo/tqdm/pytest absent |
 | EMP-022 | `is_email_verified` False for no-email/no-OAuth rows | `tested_locally` | 2026-06-10 `bd3fff4` | engineering | ghost-row/oauth-map/legacy-column tests |
 | EMP-009 | ORM index declarations aligned with migrations | `tested_locally` | 2026-06-10 `be945ac` | engineering | metadata introspection asserts name parity |
-| EMP-023 | SERVICES.md auth/observability refresh | `implemented` | 2026-06-10 (no commit — file lives outside the repo) | operator | `E:/startup projects/employed.co.mz/SERVICES.md` edited; not committable from this repo (see finding BFS-002) |
+| EMP-023 | SERVICES.md auth/observability refresh | `implemented` | 2026-06-15 (cleanse) | operator | `SERVICES.md` is in-repo and committable; refreshed in the 2026-06-15 self-contained cleanse |
 | EMP-011 | Sentry/uptime provisioning | `blocked` (external-ops) | 2026-06-10 `c238655` (in-repo env-schema part) | operator | Provisioning + redeploy are operator actions; see BL-003 |
 | EMP-014 | Stripe dashboard webhook-URL verification | `blocked` (external-ops) | 2026-06-10 `dee9a00` (in-repo smoke test) | operator | Dashboard check is an operator action; see BL-004 |
 | EMP-028 | Poster contact email auth-gated (anonymous payloads omit it; explicit signed-in reveal + sign-in CTA) | `tested_locally` | 2026-06-11 (this pass) | engineering | Operator authorized acting on the open decision; regression tests in `tests/test_jobs.py`; policy + reversal path in KL-06; closes BL-005 |

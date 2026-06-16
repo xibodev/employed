@@ -11,7 +11,7 @@ verified_by: fix-executor follow-up pass, quality run 2026-06-10_120309
 > (upserted by `deploy-uat.yml`). Local template: `deploy/.env.example`.
 > Var × consumer map: `docs/architecture/CONFIG_AND_SECRETS_MAP.md`.
 >
-> Principle (AI-OPS Rule 11): mutable values are runtime config — a change is
+> Principle (runtime config): mutable values are runtime config — a change is
 > a restart, not a rebuild. The backend reads settings through
 > `backend/app/config.py` (pydantic-settings, case-insensitive, `.env`
 > support). Frontend `NEXT_PUBLIC_API_URL` / `NEXT_PUBLIC_RECAPTCHA_SITE_KEY`

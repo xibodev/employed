@@ -1,4 +1,4 @@
-# Deploy to Box 3 (109.123.241.71 — Consumer + SaaS).
+# Deploy to Box 3 (Consumer + SaaS) — host resolved from the BOX3_HOST secret.
 # Triggers on push to the `uat` branch.
 #
 # Required GitHub secrets:

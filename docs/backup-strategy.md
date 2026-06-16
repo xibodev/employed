@@ -6,7 +6,7 @@ verified_by: doc-drift audit, quality run 2026-06-10_120309
 
 # Backup Strategy & Disaster Recovery
 
-> employed.co.mz — PostgreSQL 16 on Box 3 (`109.123.241.71`)
+> employed.co.mz — PostgreSQL 16 on Box 3
 >
 > **Status: requires-verification.** This document defines the target
 > procedure. Whether the backup cron and off-site sync are actually

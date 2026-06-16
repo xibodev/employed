@@ -1,7 +1,7 @@
 ---
-last_verified: 2026-06-11T04:50:00Z
+last_verified: 2026-06-15T00:00:00Z
 git_ref: fix/quality-run-2026-06-10 (uat baseline 00aa899)
-verified_by: fix-executor follow-up pass, quality run 2026-06-10_120309
+verified_by: self-contained cleanse 2026-06-15
 ---
 
 # DEPLOY.md — employed.co.mz
@@ -20,9 +20,9 @@ verified_by: fix-executor follow-up pass, quality run 2026-06-10_120309
 
 ## Where deployed
 
-- **Box**: `box3` (109.123.241.71)
+- **Box**: Box 3 (Contabo VPS) — host/IP in local SSH config + GH secret `BOX3_HOST` (never in-repo)
 - **Host ports (loopback only)**: `127.0.0.1:3300` (frontend) + `127.0.0.1:3301` (backend API)
-- **Public hostnames** (Caddy, managed outside this repo): `employed.xibodev.com`, `mx.employed.xibodev.com`, `mz.employed.xibodev.com` → :3300; `api.employed.xibodev.com` → :3301. These are the current UAT values of `NEXT_PUBLIC_APP_URL` / `FRONTEND_BASE_URL` / `NEXT_PUBLIC_API_URL` — the domain is env-derived, never hardcoded (AI-OPS Rule 2).
+- **Public hostnames** (Caddy, managed outside this repo): `employed.xibodev.com`, `mx.employed.xibodev.com`, `mz.employed.xibodev.com` → :3300; `api.employed.xibodev.com` → :3301. These are the current UAT values of `NEXT_PUBLIC_APP_URL` / `FRONTEND_BASE_URL` / `NEXT_PUBLIC_API_URL` — the domain is env-derived, never hardcoded.
 - **On-box compose**: `/opt/employed/docker-compose.yml` (SCPd from `deploy/docker-compose.prod.yml` on every deploy)
 
 ## How deployed
@@ -44,7 +44,7 @@ verified_by: fix-executor follow-up pass, quality run 2026-06-10_120309
 Optional: `EMPLOYED_UAT_SENTRY_DSN` (absent → empty string → backend Sentry
 no-op; provision per BL-003 and the workflow picks it up on the next deploy).
 
-Resolve values per `_integrations/CREDENTIALS.md` — never paste them anywhere.
+Values live only in GitHub Actions secrets and the operator vault — never paste them anywhere or commit them. See `docs/operations/INFRASTRUCTURE.md` § Secrets boundary.
 
 ## Required env vars
 
@@ -54,7 +54,7 @@ Resolve values per `_integrations/CREDENTIALS.md` — never paste them anywhere.
 ## Restart procedure
 
 ```bash
-ssh -i ~/.ssh/contabo_box3 ubuntu@109.123.241.71
+ssh -i ~/.ssh/contabo_box3 ubuntu@$BOX3_HOST   # Box 3 IP from local SSH config / GH secret BOX3_HOST
 cd /opt/employed
 docker compose restart
 docker compose logs --tail 50
@@ -76,9 +76,9 @@ For a code rollback, revert on the `uat` branch and push (triggers a fresh deplo
 
 ## External integrations (actual, this product)
 
-- **Email**: Resend SMTP relay (`smtp.resend.com:465`, SSL; `SMTP_PASSWORD` = Resend API key). Sender `noreply@xibodev.com` until an Employed domain is verified in Resend.
-- **Uptime**: UptimeRobot — frontend + API `/health` monitors LIVE (see `docs/operations/uptime-robot.md`).
-- **Errors**: Sentry SDKs wired in both backend (`init_sentry()`) and frontend (`@sentry/nextjs`); **no Sentry project/DSN provisioned yet** — no-op until `SENTRY_DSN` is set (operator TODO EMP-011).
+- **Email**: Resend SMTP relay (`smtp.resend.com:465`, SSL; `SMTP_PASSWORD` = Resend API key), sender `noreply@xibodev.com`. **Target: AWS SES** (`eu-west-1`) with sender `noreply@employed.xibodev.com` once `employed.xibodev.com` is DKIM-verified — see `docs/operations/INFRASTRUCTURE.md`.
+- **Uptime**: UptimeRobot — frontend + API `/health` monitors LIVE (legacy). Portfolio standard is **Gatus on Box 0** (migration pending). See `docs/operations/uptime-monitoring.md`.
+- **Errors**: Sentry SDKs wired in both backend (`init_sentry()`) and frontend (`@sentry/nextjs`); **no DSN provisioned yet** — no-op until `SENTRY_DSN` is set. Target is **Bugsink on Box 0** (`errors.xibodev.com`), a DSN-only swap (operator TODO EMP-011). See `docs/operations/bugsink-setup.md`.
 - **DNS / TLS**: Cloudflare zone `xibodev.com` + Caddy ACME on Box 3.
 - Not used: Vercel, New Relic (not installed), MinIO/S3.
 
@@ -90,6 +90,5 @@ For a code rollback, revert on the `uat` branch and push (triggers a fresh deplo
 ## See also
 
 - `docs/architecture/DEPLOYMENT_TOPOLOGY.md` — full observed topology
-- `SERVICES.md` (wrapper folder, canonical) / in-repo `SERVICES.md` — live state + TODOs
-- `_integrations/BOXES.md` — box × port allocation
-- `_integrations/CREDENTIALS.md` — secret × repo × purpose
+- `SERVICES.md` — canonical live state + TODOs
+- `docs/operations/INFRASTRUCTURE.md` — box, port block, domains, error/email/uptime standards, secrets boundary

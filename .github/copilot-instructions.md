@@ -5,7 +5,7 @@
 FastAPI + Next.js job board with market selection by subdomain (`mx.*`, `mz.*`).
 Frontend is in `frontend/`; backend is in `backend/`.
 
-## Mandatory rules (from portfolio AI-OPS)
+## Mandatory rules (self-contained)
 
 1. **No AI authorship trailers** — no `Co-Authored-By: Claude` lines, no
    "Generated with AI" footers in docs or commits.
@@ -95,8 +95,7 @@ Concrete gaps (in priority order):
    *before* push; fail on HIGH/CRITICAL. Acceptable allow-list lives in
    `.trivyignore`.
 10. **Deploy notifications.** Post success/failure + commit SHA + actor to a
-    Slack/Discord webhook (see `_integrations/` if one exists; otherwise add
-    `DEPLOY_WEBHOOK_URL` to repo secrets).
+    Slack/Discord webhook via a `DEPLOY_WEBHOOK_URL` repo secret.
 
 Acceptance for "ready to clone into `deploy-prod.yml`":
 - A failing `ci.yml` blocks any UAT deploy.

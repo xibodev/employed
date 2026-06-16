@@ -1,5 +1,5 @@
 /**
- * EMP-012 (AI-OPS Rule 11): mutable config resolves at runtime, never baked.
+ * EMP-012 (runtime config): mutable config resolves at runtime, never baked.
  *
  * Next.js inlines NEXT_PUBLIC_* values into the client bundle at build time,
  * which made the API URL and reCAPTCHA site key rebuild-only config. The

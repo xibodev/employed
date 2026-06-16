@@ -31,5 +31,5 @@ jobs:
             echo "Next steps:"
             echo "  1. Add EMPLOYED_UAT_* secrets to this GitHub repo."
             echo "  2. Add Caddy routes for employed.xibodev.com / api.employed.xibodev.com."
-            echo "  3. Add Cloudflare DNS A records pointing to Box 3 (109.123.241.71)."
+            echo "  3. Add Cloudflare DNS A records pointing to Box 3 (host in the BOX3_HOST secret)."
             echo "  4. Push to the uat branch to trigger the full deploy."

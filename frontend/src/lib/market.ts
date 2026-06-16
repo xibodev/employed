@@ -1,7 +1,7 @@
 import type { MarketConfig, MarketKey } from "@/lib/types";
 
 /**
- * EMP-013/EMP-024 (AI-OPS Rule 2): the deployment domain is never hardcoded
+ * EMP-013/EMP-024: the deployment domain is never hardcoded
  * in source. All market hostnames derive from the single NEXT_PUBLIC_APP_URL
  * env var (the UAT/production apex). Local dev falls back to lvh.me-style
  * market subdomains.

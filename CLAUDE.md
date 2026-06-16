@@ -5,6 +5,11 @@
 > Detailed observed-state maps live in `docs/architecture/` (API map, route
 > map, data model, config & secrets map, deployment topology). Prefer those
 > for anything load-bearing; this file is the short orientation.
+>
+> This repo is **self-contained** — it depends on no parent-folder docs.
+> Infrastructure facts and portfolio conventions (deploy box, port block,
+> domains, error/email/uptime standards, secrets boundary) are in
+> `docs/operations/INFRASTRUCTURE.md`.
 
 ## Overview
 
@@ -72,7 +77,7 @@ npx playwright test tests/e2e/      # requires a running app stack
 
 ## Notes
 
-- Historical Meteor migration documents remain in the repo as reference only (`MIGRATION-PLAN.md`, `docs/meteor-3-package-audit.md`, `docs/decisions/001`–`004`, `docs/archive/`).
+- Historical Meteor-era documents are retired to `docs/archive/` (migration plan, redesign plan, package audit, ADRs `001`–`004`) — reference only; see `docs/archive/README.md`. Current ADRs `005`/`006` stay in `docs/decisions/`.
 - All compose files live under `deploy/`; there are no root-level `docker-compose*.yml` files.
 - The project was originally imported from `nate-strauser/wework`; the current codebase is now a separate FastAPI + Next.js implementation.
 
@@ -80,8 +85,10 @@ npx playwright test tests/e2e/      # requires a running app stack
 
 Standard env var names are used where applicable: `SENTRY_DSN`, `SENTRY_ENVIRONMENT`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_APP_URL` (deployment domain — never hardcode it in source), `FRONTEND_BASE_URL` (email link base). See `deploy/.env.example`, `frontend/.env.example`, and `docs/architecture/CONFIG_AND_SECRETS_MAP.md`.
 
+Planned provider cutovers (DSN/credential swaps, no code change): `SENTRY_DSN` will point at **Bugsink** on Box 0 (`errors.xibodev.com`); email moves from Resend to **AWS SES** (`eu-west-1`). Details in `docs/operations/INFRASTRUCTURE.md`.
+
 ## AI Assistant Rules
 
-- No `Co-Authored-By: Claude` trailers, no AI authorship attribution in docs or commits (AI-OPS Rule 5).
-- Never paste credentials into chat. Use file paths to reference secrets (AI-OPS Rule 4).
-- Locale codes: `en`, `pt`, `es` only (STANDARDS §4).
+- No `Co-Authored-By: Claude` trailers, no AI authorship attribution in docs or commits.
+- Never paste credentials into chat or commit them. Reference secrets by name; values live in GitHub Actions secrets or the operator vault (`docs/operations/INFRASTRUCTURE.md` § Secrets boundary).
+- Locale codes: `en`, `pt`, `es` only — no extended tags like `pt-MZ`.
