@@ -16,7 +16,7 @@ verified_by: self-contained cleanse 2026-06-15
 | Repo | `mekjr1/employed.co.mz` |
 | Default branch | `master` (GitHub) — rename to `main` is an open TODO in `SERVICES.md` |
 | Deploy branch | `uat` (push to `uat` triggers the deploy workflow) |
-| Live UAT baseline | `uat` @ `00aa899` (branch `fix/quality-run-2026-06-10` is unmerged/undeployed) |
+| Live UAT baseline | live build `uat` @ `00aa899`; `uat` branch ref now `e168f8b` (merged 2026-06-15). Deploy run `27585388941` **FAILED** at `docker compose pull` (GHCR `denied` on Box 3) — live build unchanged. See Drift & notes |
 
 ## Where deployed
 
@@ -84,8 +84,9 @@ For a code rollback, revert on the `uat` branch and push (triggers a fresh deplo
 
 ## Drift & notes
 
+- **2026-06-15 deploy FAILED (run `27585388941`).** `uat` was fast-forwarded to `e168f8b` and both images built + pushed to GHCR, but Box 3's `docker compose pull` returned `ghcr.io/mekjr1/employed-api:uat … error from registry: denied` — the box is not authenticated to GHCR (expired token or package read perms). Live build is therefore unchanged (`00aa899`). **Fix:** on Box 3 run `docker login ghcr.io` with a valid token (or make the GHCR packages readable), then re-run the Deploy UAT workflow. Tracked in `TODO.md`.
 - Deploy workflow SCPs the compose file, so source-repo compose edits flow through on the next deploy. The worker's Redis-ping healthcheck fix is committed in `deploy/docker-compose.prod.yml` but the live box still shows the worker false-negative "unhealthy" until the next deploy.
-- Live UAT runs pre-fix code (`00aa899`): known live bugs (admin reports 500, API-host email links, broken anonymous-post reCAPTCHA, X-Forwarded-Host market resolution) are fixed on the unmerged branch — see `docs/product/RELEASE_NOTES.md`.
+- Live UAT runs pre-fix code (`00aa899`): known live bugs (admin reports 500, API-host email links, broken anonymous-post reCAPTCHA, X-Forwarded-Host market resolution) are fixed on the merged-but-undeployed `uat` ref (`e168f8b`) — see `docs/product/RELEASE_NOTES.md`.
 
 ## See also
 

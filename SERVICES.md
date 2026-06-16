@@ -23,7 +23,15 @@ Multilingual job board for Mozambique and Mexico. Companies post jobs, candidate
 
 Repo/folder slug `employed.co.mz` is retained. Live infrastructure uses the shorter brand slug `employed` for `/opt/employed/`, GHCR images, and observability resource names.
 
-## Live state — verified 2026-06-10 (deployed build: `uat` @ `00aa899`)
+## Live state — live build still `uat` @ `00aa899` (verified 2026-06-10)
+
+> **2026-06-15 deploy attempt FAILED.** Branch `fix/quality-run-2026-06-10`
+> (40 commits) was merged + pushed to `uat` (`e168f8b`) and both Docker images
+> built + pushed to GHCR, but the Box 3 deploy (run `27585388941`) failed at
+> `docker compose pull` — `ghcr.io/mekjr1/employed-api:uat … error from
+> registry: denied`. **Box 3 cannot authenticate to GHCR, so the live build is
+> unchanged (`00aa899`) and every "live bug" below is still live.** Fix: re-auth
+> Box 3 to GHCR, then re-run the deploy. Tracked in [`TODO.md`](TODO.md).
 
 | Surface | State |
 |---------|-------|
@@ -40,11 +48,14 @@ Repo/folder slug `employed.co.mz` is retained. Live infrastructure uses the shor
 | Error tracking | 🟡 **WIRED, NOT PROVISIONED.** Backend `init_sentry()` and frontend `@sentry/nextjs` configs ship in the deployed build (no-op without DSN). No DSN exists yet. **Target = Bugsink on Box 0** (`errors.xibodev.com`), projects `employed-api` / `employed-web` — a DSN-only swap (EMP-011). See `docs/operations/bugsink-setup.md`. |
 | Uptime | 🟢 **LIVE (UptimeRobot, legacy).** Frontend monitor `employed.xibodev.com` (id `803170467`) UP; API monitor `employed-api-uat` (id `803177488`, `/health`) UP. **Portfolio standard is now Gatus on Box 0** — migration pending. See `docs/operations/uptime-monitoring.md`. |
 
-### Pending release — branch `fix/quality-run-2026-06-10` (NOT deployed)
+### Pending release — branch `fix/quality-run-2026-06-10` (merged to `uat`, deploy FAILED)
 
-28 fix commits + docs, **local-only (unmerged, unpushed)**. Live Box 3 runs
-pre-fix `uat` @ `00aa899`. Branch-only behavior (do not expect it on the live
-box): httpOnly `employed_refresh_token` cookie (refresh out of localStorage),
+Now **merged + pushed to `uat` (`e168f8b`, 2026-06-15)** — 34 fix commits + the
+2026-06-15 self-contained docs cleanse. Both images built + pushed to GHCR, but
+the Box 3 deploy (run `27585388941`) **failed at `docker compose pull` (GHCR
+`denied`)**, so the live box still runs pre-fix `uat` @ `00aa899`. Branch
+behavior is therefore **not yet live** (until Box 3 re-auths to GHCR and the
+deploy is re-run): httpOnly `employed_refresh_token` cookie (refresh out of localStorage),
 Redis-backed rate limit/lockout, X-Forwarded-Host market resolution,
 frontend-targeted email links, working anonymous-post reCAPTCHA, admin
 reports fix, runtime `window.__ENV` config, mandatory mobile-money webhook
