@@ -7,3 +7,8 @@ python-slugify==8.0.4
 bleach==6.3.0
 httpx==0.28.1
 python-multipart==0.0.20
+# HTML->PDF engine for server-side resume rendering (R14). Pure-Python
+# (reportlab/html5lib) — needs no system libraries on python:3.12-slim. The
+# renderer in app/services/resume_templates.py prefers WeasyPrint if present,
+# then xhtml2pdf, then a built-in text fallback; this pins the working engine.
+xhtml2pdf==0.2.16

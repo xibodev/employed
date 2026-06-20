@@ -4,6 +4,7 @@ import os
 import random
 from datetime import timedelta
 from typing import Any
+from uuid import UUID
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
@@ -36,6 +37,7 @@ from app.services.model_utils import (
     set_attr,
     utcnow,
 )
+from app.services.rbac import JOB_POST, has_permission
 
 router = APIRouter(prefix="/jobs", tags=["jobs"])
 
@@ -299,8 +301,45 @@ def _payload_values(payload: Any, **kwargs) -> dict:
     return payload.dict(**kwargs)
 
 
+def _coerce_company_id(value: Any) -> UUID | None:
+    """Coerce a raw company identifier to a UUID, or ``None`` when absent.
+
+    Raises ``400`` for a present-but-malformed identifier so a bad request is
+    not silently treated as an anonymous post.
+    """
+    if value in (None, ""):
+        return None
+    if isinstance(value, UUID):
+        return value
+    try:
+        return UUID(str(value))
+    except (ValueError, TypeError, AttributeError) as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid company identifier"
+        ) from exc
+
+
+def _authorize_company_post(db: Any, payload: JobCreate, user: Any | None) -> UUID | None:
+    """Resolve the target company for an on-behalf-of post (R4.3/4.4/4.5).
+
+    Returns the company id to stamp on the job when the caller is authorized,
+    or ``None`` when no company was requested (legacy/anonymous job, R4.3).
+    Rejects with ``403`` when the caller does not hold ``job:post`` in the
+    target company via an active membership or a platform role (R4.5).
+    """
+    company_id = _coerce_company_id(getattr(payload, "company_id", None))
+    if company_id is None:
+        return None
+    if user is None or not has_permission(db, user, JOB_POST, company_id=company_id):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to post on behalf of this company",
+        )
+    return company_id
+
+
 def _set_job_fields(job: Any, payload: JobCreate | JobUpdate, market: dict, user: Any | None = None) -> None:
-    values = _payload_values(payload, exclude_unset=True, exclude={"recaptcha_token"})
+    values = _payload_values(payload, exclude_unset=True, exclude={"recaptcha_token", "company_id"})
     simple_fields = {
         "title": ("title",),
         "company": ("company",),
@@ -488,8 +527,12 @@ async def create_job(
     if current_user is None and not await _verify_recaptcha(payload.recaptcha_token, request):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="reCAPTCHA validation failed")
 
+    company_id = _authorize_company_post(db, payload, current_user)
+
     job = _job_model()()
     _set_job_fields(job, payload, market, current_user)
+    if company_id is not None:
+        set_attr(job, company_id, "company_id")
     saved = save(db, job)
     if current_user is not None:
         email = get_primary_email(current_user)

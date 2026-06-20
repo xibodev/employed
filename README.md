@@ -2,9 +2,9 @@
 
 # Employed
 
-Employed is a multilingual job board for Mozambique and Mexico, localized by subdomain and rebuilt on a FastAPI + Next.js stack.
+Employed is a multilingual hiring platform for Mozambique and Mexico, localized by subdomain and built on a FastAPI + Next.js stack.
 
-Companies can post roles, candidates can browse active opportunities, and admins can moderate listings before they go live.
+It began as a job board — companies post roles, candidates browse active opportunities, and admins moderate listings before they go live — and is evolving into a trust-centric, integration-ready hiring platform: *more than a job board, less than a heavy ATS*. That evolution adds multi-tenant companies and memberships, a two-layer permission-based access model, per-entity verification with composable trust badges, version-controlled JSON Resume profiles, a lightweight applications pipeline, an append-only audit trail, outbound webhooks, and a versioned export API exposing standard schemas (JSON Resume, schema.org `JobPosting`). Market (geography/locale/payment) and tenant (organization) remain orthogonal axes.
 
 ## Markets
 
@@ -50,8 +50,8 @@ The product supports English, Spanish, and Portuguese. Each market has a default
 | [`CLAUDE.md`](CLAUDE.md) | Current architecture notes for FastAPI + Next.js |
 | [`DEPLOY.md`](DEPLOY.md) | Deployment topology and procedures (Box 3 UAT) |
 | [`docs/operations/INFRASTRUCTURE.md`](docs/operations/INFRASTRUCTURE.md) | Self-contained infra context: box, port block, domains, error/email/uptime standards, secrets boundary |
-| [`docs/architecture/`](docs/architecture/) | Observed-state architecture bundle (API map, routes, data model, config map, deployment topology) |
-| [`docs/product/`](docs/product/) | Feature registry, backlog, known limitations, release notes |
+| [`docs/architecture/`](docs/architecture/) | Observed-state architecture bundle (API map, routes, data model, config map, deployment topology, plus RBAC & tenancy, verification & trust, integration & export, and migration strategy) |
+| [`docs/product/`](docs/product/) | Positioning, user types & journeys, feature registry, backlog, known limitations, release notes |
 | [`docs/api-reference.md`](docs/api-reference.md) | API documentation |
 | [`docs/payment-flows.md`](docs/payment-flows.md) | Stripe, M-Pesa, and e-Mola flows |
 | [`docs/markets-and-locales.md`](docs/markets-and-locales.md) | Market and locale behaviour |

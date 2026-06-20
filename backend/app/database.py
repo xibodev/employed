@@ -50,12 +50,16 @@ def set_created_and_updated_timestamps(_mapper, _connection, target: Base) -> No
     now = datetime.now(timezone.utc)
     if getattr(target, "created_at", None) is None:
         target.created_at = now
-    target.updated_at = now
+    # Append-only models (e.g. ProfileVersion, AuditLog) cancel the inherited
+    # `updated_at` column; only set it when the model actually maps it.
+    if "updated_at" in type(target).__table__.columns:
+        target.updated_at = now
 
 
 @event.listens_for(Base, "before_update", propagate=True)
 def set_updated_timestamp(_mapper, _connection, target: Base) -> None:
-    target.updated_at = datetime.now(timezone.utc)
+    if "updated_at" in type(target).__table__.columns:
+        target.updated_at = datetime.now(timezone.utc)
 
 
 def _engine_options() -> dict[str, object]:

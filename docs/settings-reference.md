@@ -140,6 +140,20 @@ Sender is `noreply@xibodev.com` (domain verified in Resend).
 
 ---
 
+## Hiring platform (multi-tenant-hiring-platform spec)
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `RESUME_ARTIFACT_DIR` | No | `<system temp>/employed-resume-artifacts` | Directory the arq `render_resume_pdf` task writes downloadable PDF resume artifacts to. Optional — the worker is functional without it. |
+
+> Outbound-webhook delivery tuning (`WEBHOOK_BACKOFF_BASE_SECONDS`,
+> `WEBHOOK_BACKOFF_CAP`, `WEBHOOK_MAX_ATTEMPTS`,
+> `WEBHOOK_DELIVERY_TIMEOUT_SECONDS`) is set as **module constants** in
+> `backend/app/workers/tasks.py`, not as environment variables. The export API
+> version is a path segment (`/export/v1`), not config.
+
+---
+
 ## Observability
 
 | Variable | Required | Default | Description |

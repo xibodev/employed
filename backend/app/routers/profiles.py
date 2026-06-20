@@ -1,14 +1,28 @@
 from __future__ import annotations
 
 from typing import Any
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.auth.dependencies import get_current_user, get_user_id, is_admin_user
 from app.database import get_db
-from app.schemas.profiles import ProfileCreate, ProfileRead, ProfileUpdate
+from app.models.profile_version import ProfileVersion
+from app.schemas.profiles import (
+    ProfileCreate,
+    ProfileRead,
+    ProfileUpdate,
+    ProfileVersionRead,
+    ProfileVersionSaveRequest,
+    ProfileVersionSummary,
+)
 from app.services.html_sanitizer import sanitize_html
 from app.services.model_utils import get_attr, query_all, resolve_model, save, set_attr, utcnow
+from app.services.profiles_versioning import (
+    JSONResumeValidationError,
+    ensure_live_profile,
+    save_version,
+)
 
 router = APIRouter(prefix="/profiles", tags=["profiles"])
 
@@ -87,6 +101,63 @@ def _apply_profile_fields(profile: Any, payload: ProfileCreate | ProfileUpdate, 
         set_attr(profile, utcnow(), "created_at", "createdAt")
     if get_attr(profile, "status") is None:
         set_attr(profile, "pending", "status")
+
+
+@router.post(
+    "/versions",
+    response_model=ProfileVersionSummary,
+    status_code=status.HTTP_201_CREATED,
+)
+def save_profile_version(
+    payload: ProfileVersionSaveRequest,
+    db: Any = Depends(get_db),
+    current_user: Any = Depends(get_current_user),
+) -> ProfileVersionSummary:
+    """Save an immutable snapshot of the authenticated owner's live profile (R13.2).
+
+    An optional ``json_resume`` body updates the live working copy before the
+    snapshot is taken. The live profile is materialised on first save (R13.1).
+    """
+    user_id = get_user_id(current_user)
+    try:
+        profile = ensure_live_profile(db, user_id=user_id)
+        version = save_version(db, profile=profile, json_resume=payload.json_resume)
+    except JSONResumeValidationError as exc:
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+    db.commit()
+    db.refresh(version)
+    return ProfileVersionSummary.model_validate(version)
+
+
+@router.get("/versions", response_model=list[ProfileVersionSummary])
+def list_profile_versions(
+    db: Any = Depends(get_db),
+    current_user: Any = Depends(get_current_user),
+) -> list[ProfileVersionSummary]:
+    """List the authenticated owner's profile versions, oldest first (R13.2/13.3)."""
+    user_id = get_user_id(current_user)
+    versions = (
+        db.query(ProfileVersion)
+        .filter(ProfileVersion.user_id == user_id)
+        .order_by(ProfileVersion.version_number.asc())
+        .all()
+    )
+    return [ProfileVersionSummary.model_validate(version) for version in versions]
+
+
+@router.get("/versions/{version_id}", response_model=ProfileVersionRead)
+def get_profile_version(
+    version_id: UUID,
+    db: Any = Depends(get_db),
+    current_user: Any = Depends(get_current_user),
+) -> ProfileVersionRead:
+    """Return a single immutable profile version owned by the authenticated user."""
+    user_id = get_user_id(current_user)
+    version = db.get(ProfileVersion, version_id)
+    if version is None or version.user_id != user_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Profile version not found")
+    return ProfileVersionRead.model_validate(version)
 
 
 @router.get("/{user_id}", response_model=ProfileRead)

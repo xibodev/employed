@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Any
+from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -63,3 +65,30 @@ class ProfileRead(BaseModel):
     updated_at: datetime | None = None
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class ProfileVersionSaveRequest(BaseModel):
+    """Request body for saving a profile version (R13.2).
+
+    When ``json_resume`` is supplied it updates the live profile's working copy
+    before the immutable snapshot is taken; otherwise the current working copy is
+    snapshotted as-is.
+    """
+
+    json_resume: dict[str, Any] | None = None
+
+
+class ProfileVersionSummary(BaseModel):
+    """Lightweight view of an immutable profile version (R13.2/13.3)."""
+
+    id: UUID
+    version_number: int
+    created_at: datetime | None = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ProfileVersionRead(ProfileVersionSummary):
+    """Full profile-version view including the immutable JSON Resume snapshot."""
+
+    json_resume: dict[str, Any] = Field(default_factory=dict)

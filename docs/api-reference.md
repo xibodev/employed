@@ -289,11 +289,163 @@ Up to 200 reports.
 
 ### `GET /profiles/{user_id}`
 
-Public talent profile (keyed by user id, not username).
+Public talent profile (keyed by user id, not username). Active profiles only.
 
 ### `POST /profiles` → `201` / `PUT /profiles`
 
 **Auth:** Bearer. Upsert / update the caller's own profile.
+
+### `POST /profiles/versions` → `201 ProfileVersionSummary`
+
+**Auth:** Bearer. Saves an immutable JSON Resume snapshot of the caller's live
+profile. An optional `json_resume` body updates the live working copy first; the
+live profile is materialised on first save. Invalid JSON Resume → `422`.
+
+### `GET /profiles/versions`
+
+**Auth:** Bearer. Lists the caller's profile versions, oldest first.
+
+### `GET /profiles/versions/{version_id}` → `ProfileVersionRead`
+
+**Auth:** Bearer; owner only. A single immutable version; `404` if missing or
+not owned.
+
+---
+
+## Companies — `/companies`
+
+> Two-layer RBAC: tenant-scoped endpoints are guarded by `require_permission`
+> (platform role or active-membership tenant role). See
+> `docs/architecture/RBAC_AND_TENANCY.md`.
+
+### `POST /companies` → `201 CompanyRead`
+
+**Auth:** Bearer. Creates a company; `market` is taken from the request market
+context (never the client). The caller becomes the active `org_owner` (atomic).
+`409` on conflict.
+
+### `GET /companies/{company_id}` → `CompanyRead`
+
+**Auth:** Bearer. `404` if missing. The signing secrets of any webhook endpoints
+are never included.
+
+### `POST /companies/{company_id}/verify-domain` → `CompanyRead`
+
+**Auth:** permission `company:verify_domain`. Body selects DNS TXT
+(`expected_token`) or matching-member-email proof. On success the domain is
+appended to `verified_email_domains` and the `domain verified` badge attached; a
+failed proof → `422` (no change).
+
+---
+
+## Memberships — `/companies/{company_id}/members`
+
+### `GET ` / `POST ` (list / invite)
+
+**Auth:** permission `company:manage_members`. Invite creates an `invited`
+membership and records `invited_by`; `201`.
+
+### `POST /{membership_id}/accept`
+
+**Auth:** Bearer — the invited user only. Moves `invited` → `active`. Accepting a
+non-`invited` membership → `409` (unchanged); accepting someone else's → `403`.
+
+### `POST /{membership_id}/suspend`
+
+**Auth:** permission `company:manage_members`. Sets status `suspended`, which
+revokes that membership's tenant permissions.
+
+---
+
+## Applications
+
+### `GET /companies/{company_id}/applications` → `[ApplicationRead]`
+
+**Auth:** permission `application:review`. Lists a company's applications; without
+the permission → `403`.
+
+### `PATCH /applications/{application_id}/status` → `ApplicationRead`
+
+**Auth:** permission `application:advance` (resolved from the application's
+company). Advances the pipeline stage (`applied`/`reviewed`/`shortlisted`/
+`rejected`/`hired`), persists the new stage, writes an audit row, and emits
+`application.status_changed`. Without the permission → `403`.
+
+---
+
+## Moderation & verification — `/moderation`
+
+Platform publication moderation and the shared verification state machine. Each
+action writes an audit row; an illegal verification transition → `409`.
+
+### `POST /moderation/jobs/{job_id}/block`
+
+**Auth:** permission `job:block`. Publication status → `flagged` (leaves public
+visibility).
+
+### `POST /moderation/jobs/{job_id}/unpublish`
+
+**Auth:** permission `job:unpublish`. Publication status → `inactive`.
+
+### `POST /moderation/jobs/{job_id}/mark-review`
+
+**Auth:** permission `job:mark_review`. `verification_status` → `flagged`.
+
+### `POST /moderation/jobs/{job_id}/verify`
+
+**Auth:** permission `job:verify`. `verification_status` → `verified`.
+
+### `POST /moderation/companies/{company_id}/verify`
+
+**Auth:** permission `company:verify`. Company `verification_status` → `verified`.
+
+### `POST /moderation/profiles/{profile_id}/verify`
+
+**Auth:** permission `profile:verify`. Profile `verification_status` → `verified`.
+
+---
+
+## Webhook endpoints — `/webhook-endpoints`
+
+Outbound webhook endpoint management (distinct from the inbound payment webhooks
+under `/webhooks`). The signing `secret` is never returned.
+
+### `POST /webhook-endpoints` → `201 WebhookEndpointRead`
+
+**Auth:** permission `company:manage` (company from the body; a platform-level
+endpoint with `company_id` omitted requires the permission across all tenants).
+Registers an endpoint and its event subscriptions.
+
+### `GET /webhook-endpoints?company_id=`
+
+**Auth:** permission `company:manage` (scoped to `company_id` when provided, else
+platform-level). Lists endpoints.
+
+### `DELETE /webhook-endpoints/{endpoint_id}` → `WebhookEndpointRead`
+
+**Auth:** permission `company:manage` (the endpoint's company). Soft delete
+(`active = false`); delivery history is retained.
+
+---
+
+## Export — `/export/v1`
+
+Versioned (path segment), read-only. **Auth:** Bearer (any valid token). A
+nonexistent identifier → `404`.
+
+### `GET /export/v1/candidates/{id}`
+
+Candidate as a JSON Resume document (resolves a live `Profile` or a
+`ProfileVersion`).
+
+### `GET /export/v1/positions/{id}` (alias `GET /export/v1/jobs/{id}`)
+
+Job as schema.org `JobPosting` JSON-LD. `positions` follows HR Open Standards
+(*PositionOpening*); `jobs` is the schema.org-parity alias.
+
+### `GET /export/v1/applications/{id}`
+
+Normalized Application object.
 
 ---
 

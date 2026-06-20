@@ -1,5 +1,17 @@
 import { getApiUrl } from "@/lib/runtime-config";
-import type { ApiErrorShape, Job, JobFormValues, JobsQuery, PaginatedResponse } from "@/lib/types";
+import type { CompanyMembership } from "@/lib/tenant";
+import type {
+  ApiErrorShape,
+  Company,
+  CompanyCreateValues,
+  DomainVerifyValues,
+  Job,
+  JobFormValues,
+  JobsQuery,
+  Membership,
+  MembershipInviteValues,
+  PaginatedResponse,
+} from "@/lib/types";
 
 function getApiBaseUrl(): string {
   // EMP-012 (Rule 11): resolved at call time from runtime config, so an
@@ -169,5 +181,157 @@ export async function deleteJob(id: string, options: Omit<ApiFetchOptions, "body
   return apiFetch<void>(`/jobs/${id}`, {
     ...options,
     method: "DELETE"
+  });
+}
+
+// --- Companies (multi-tenant hiring platform) ---
+
+/**
+ * Create a Company (`POST /companies`). The owning market is resolved
+ * server-side from the request hostname; the authenticated user becomes the
+ * active `org_owner`.
+ */
+export async function createCompany(payload: CompanyCreateValues, options: Omit<ApiFetchOptions, "body"> = {}) {
+  return apiFetch<Company>("/companies", {
+    ...options,
+    method: "POST",
+    body: payload as unknown as Record<string, unknown>,
+    cache: options.cache ?? "no-store"
+  });
+}
+
+/** Read a single Company by id (`GET /companies/{id}`). */
+export async function getCompany(companyId: string, options: Omit<ApiFetchOptions, "query"> = {}) {
+  return apiFetch<Company>(`/companies/${companyId}`, {
+    ...options,
+    cache: options.cache ?? "no-store"
+  });
+}
+
+/**
+ * Verify a Company domain (`POST /companies/{id}/verify-domain`) via DNS TXT or
+ * matching member emails. Returns the updated Company on success.
+ */
+export async function verifyCompanyDomain(
+  companyId: string,
+  payload: DomainVerifyValues,
+  options: Omit<ApiFetchOptions, "body"> = {}
+) {
+  return apiFetch<Company>(`/companies/${companyId}/verify-domain`, {
+    ...options,
+    method: "POST",
+    body: payload as unknown as Record<string, unknown>,
+    cache: options.cache ?? "no-store"
+  });
+}
+
+// --- Memberships ---
+
+/**
+ * List the companies the authenticated user belongs to
+ * (`GET /users/me/memberships`). Server-fed source for the tenant switcher;
+ * each row is already shaped as a {@link CompanyMembership}.
+ */
+export async function listMyMemberships(options: Omit<ApiFetchOptions, "query"> = {}) {
+  return apiFetch<CompanyMembership[]>("/users/me/memberships", {
+    ...options,
+    cache: options.cache ?? "no-store"
+  });
+}
+
+/** List a Company's memberships (`GET /companies/{companyId}/members`). */
+export async function listMembers(companyId: string, options: Omit<ApiFetchOptions, "query"> = {}) {
+  return apiFetch<Membership[]>(`/companies/${companyId}/members`, {
+    ...options,
+    cache: options.cache ?? "no-store"
+  });
+}
+
+/** Invite a user to a Company (`POST /companies/{companyId}/members`). */
+export async function inviteMember(
+  companyId: string,
+  payload: MembershipInviteValues,
+  options: Omit<ApiFetchOptions, "body"> = {}
+) {
+  return apiFetch<Membership>(`/companies/${companyId}/members`, {
+    ...options,
+    method: "POST",
+    body: payload as unknown as Record<string, unknown>,
+    cache: options.cache ?? "no-store"
+  });
+}
+
+/** Accept an invitation (`POST /companies/{companyId}/members/{membershipId}/accept`). */
+export async function acceptMembership(
+  companyId: string,
+  membershipId: string,
+  options: Omit<ApiFetchOptions, "body"> = {}
+) {
+  return apiFetch<Membership>(`/companies/${companyId}/members/${membershipId}/accept`, {
+    ...options,
+    method: "POST",
+    cache: options.cache ?? "no-store"
+  });
+}
+
+/** Suspend a membership (`POST /companies/{companyId}/members/{membershipId}/suspend`). */
+export async function suspendMembership(
+  companyId: string,
+  membershipId: string,
+  options: Omit<ApiFetchOptions, "body"> = {}
+) {
+  return apiFetch<Membership>(`/companies/${companyId}/members/${membershipId}/suspend`, {
+    ...options,
+    method: "POST",
+    cache: options.cache ?? "no-store"
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Applications & recruiter pipeline (R17) — added by task 18.3.
+// Self-contained section to avoid collisions with parallel edits to this file.
+// ---------------------------------------------------------------------------
+
+/** Fixed pipeline stages (mirrors backend `ApplicationStatus`, R16.3). */
+export type ApplicationStatus = "applied" | "reviewed" | "shortlisted" | "rejected" | "hired";
+
+/** A tracked application as returned by the recruiter endpoints (R16/R17). */
+export interface Application {
+  id: string;
+  job_id: string;
+  company_id: string | null;
+  candidate_user_id: string | null;
+  candidate_snapshot: Record<string, unknown> | null;
+  status: ApplicationStatus;
+  resume_version_id: string | null;
+  cover_note: string | null;
+  source: string;
+}
+
+/**
+ * List the applications for a company (R17.1).
+ * GET /companies/{company_id}/applications — permission-guarded server-side.
+ */
+export async function listApplications(companyId: string, options: Omit<ApiFetchOptions, "query"> = {}) {
+  return apiFetch<Application[]>(`/companies/${companyId}/applications`, {
+    ...options,
+    cache: options.cache ?? "no-store",
+  });
+}
+
+/**
+ * Advance an application to a new pipeline stage (R17.3).
+ * PATCH /applications/{application_id}/status — returns the updated application.
+ */
+export async function changeApplicationStatus(
+  applicationId: string,
+  newStatus: ApplicationStatus,
+  options: Omit<ApiFetchOptions, "body"> = {},
+) {
+  return apiFetch<Application>(`/applications/${applicationId}/status`, {
+    ...options,
+    method: "PATCH",
+    body: { new_status: newStatus },
+    cache: options.cache ?? "no-store",
   });
 }

@@ -99,6 +99,48 @@ class OAuthProvider(str, Enum):
     twitter = "twitter"
 
 
+class VerificationState(str, Enum):
+    unverified = "unverified"
+    pending = "pending"
+    verified = "verified"
+    rejected = "rejected"
+    revoked = "revoked"
+    flagged = "flagged"
+
+
+class PlatformRole(str, Enum):
+    platform_super_admin = "platform_super_admin"
+    platform_moderator = "platform_moderator"
+    platform_support = "platform_support"
+
+
+class TenantRole(str, Enum):
+    org_owner = "org_owner"
+    org_admin = "org_admin"
+    recruiter = "recruiter"
+    member = "member"  # viewer
+
+
+class MembershipStatus(str, Enum):
+    invited = "invited"
+    active = "active"
+    suspended = "suspended"
+
+
+class ApplicationStatus(str, Enum):
+    applied = "applied"
+    reviewed = "reviewed"
+    shortlisted = "shortlisted"
+    rejected = "rejected"
+    hired = "hired"
+
+
+class WebhookEvent(str, Enum):
+    job_published = "job.published"
+    application_created = "application.created"
+    application_status_changed = "application.status_changed"
+
+
 EnumType = Type[Enum]
 
 

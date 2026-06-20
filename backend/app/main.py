@@ -21,7 +21,22 @@ from app.database import get_db
 from app.logging_config import reset_request_id, set_request_id, setup_logging
 from app.middleware.market import MarketMiddleware
 from app.observability import init_sentry
-from app.routers import admin, auth, jobs, payments, profiles, public_api, reports, users
+from app.routers import (
+    admin,
+    applications,
+    auth,
+    companies,
+    export_api,
+    jobs,
+    memberships,
+    payments,
+    profiles,
+    public_api,
+    reports,
+    users,
+    verification,
+    webhooks_admin,
+)
 from app.webhooks import router as webhook_router
 
 logger = logging.getLogger(__name__)
@@ -29,13 +44,19 @@ MAX_REQUEST_BODY_SIZE = 1_048_576
 
 TAGS_METADATA = [
     {"name": "auth", "description": "Account, JWT, and OAuth endpoints."},
+    {"name": "companies", "description": "Company tenant and domain-verification endpoints."},
+    {"name": "memberships", "description": "Company membership invite, accept, suspend, and list endpoints."},
+    {"name": "applications", "description": "Recruiter application list and pipeline status endpoints."},
     {"name": "jobs", "description": "Market-scoped job listing and management endpoints."},
     {"name": "profiles", "description": "Talent profile endpoints."},
     {"name": "payments", "description": "Featured-job payment intent endpoints."},
     {"name": "reports", "description": "Community moderation report endpoints."},
     {"name": "admin", "description": "Admin moderation and user-management endpoints."},
+    {"name": "moderation", "description": "Platform publication-moderation and verification endpoints."},
     {"name": "users", "description": "Current-user account management endpoints."},
     {"name": "public-api", "description": "Public JSON endpoints that replace Restivus."},
+    {"name": "export", "description": "Versioned, read-only export of entities in standard schemas."},
+    {"name": "webhook-endpoints", "description": "Outbound webhook endpoint registration and management."},
 ]
 
 
@@ -255,13 +276,19 @@ def create_app() -> FastAPI:
     )
 
     app.include_router(auth.router)
+    app.include_router(companies.router)
+    app.include_router(memberships.router)
+    app.include_router(applications.router)
     app.include_router(jobs.router)
     app.include_router(profiles.router)
     app.include_router(payments.router)
     app.include_router(reports.router)
     app.include_router(admin.router)
     app.include_router(users.router)
+    app.include_router(verification.router)
     app.include_router(public_api.router)
+    app.include_router(export_api.router)
+    app.include_router(webhooks_admin.router)
     app.include_router(webhook_router, prefix="/webhooks")
 
     @app.api_route("/health", methods=["GET", "HEAD"], include_in_schema=False)

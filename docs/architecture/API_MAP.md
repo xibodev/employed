@@ -10,7 +10,9 @@ All routes observed in `backend/app/routers/` and `backend/app/webhooks/`,
 wired in `backend/app/main.py#create_app`. Auth column: `public` (no auth),
 `optional` (works anonymously, richer when authenticated), `user` (valid
 access token), `user+verified` (token + verified email), `admin`
-(`require_admin`). Rate limits are per client IP (Redis fixed-window;
+(`require_admin`), and `perm:<name>` (two-layer RBAC `require_permission`
+guard — platform role or active-membership tenant role; see
+RBAC_AND_TENANCY.md). Rate limits are per client IP (Redis fixed-window;
 in-process fallback without Redis).
 
 Every response carries `X-Request-ID` and `X-Market` headers. Request bodies
@@ -56,9 +58,79 @@ Market-scoped via `MarketMiddleware` (X-Forwarded-Host → Host).
 
 | Method | Path | Auth | Notes |
 |--------|------|------|-------|
-| GET | `/profiles/{user_id}` | public | |
+| GET | `/profiles/{user_id}` | public | Active profiles only |
 | POST | `/profiles` | user | Upsert of the caller's profile, 201 |
 | PUT | `/profiles` | user | Update caller's profile |
+| POST | `/profiles/versions` | user | Save an immutable JSON Resume snapshot of the caller's live profile (R13.2); optional `json_resume` body updates the live copy first; 201. Invalid JSON Resume → 422 |
+| GET | `/profiles/versions` | user | List the caller's profile versions, oldest first |
+| GET | `/profiles/versions/{version_id}` | user (owner) | A single immutable version; 404 if not owned/missing |
+
+> Profile-version routes are declared before `/{user_id}` so `versions` is not
+> captured as a user id.
+
+## Companies — `/companies` (`app/routers/companies.py`)
+
+Permission checks use the two-layer RBAC model (see RBAC_AND_TENANCY.md);
+`perm:<name>` below denotes a `require_permission` guard.
+
+| Method | Path | Auth | Notes |
+|--------|------|------|-------|
+| POST | `/companies` | user | Create a company; market taken from request context (never the client); caller becomes active `org_owner`. 201; 409 on conflict |
+| GET | `/companies/{company_id}` | user | Read a company; 404 if missing |
+| POST | `/companies/{company_id}/verify-domain` | perm:`company:verify_domain` | DNS TXT (`expected_token`) or matching-member-email proof; on success appends to `verified_email_domains` + attaches `domain verified` badge; failed proof → 422 |
+
+## Memberships — `/companies/{company_id}/members` (`app/routers/memberships.py`)
+
+| Method | Path | Auth | Notes |
+|--------|------|------|-------|
+| GET | `` | perm:`company:manage_members` | List a company's memberships |
+| POST | `` | perm:`company:manage_members` | Invite a user → `invited` membership, records `invited_by`; 201 |
+| POST | `/{membership_id}/accept` | user (the invited user only) | `invited` → `active`; non-invited/foreign → 409/403; status unchanged on failure |
+| POST | `/{membership_id}/suspend` | perm:`company:manage_members` | Set status `suspended` (revokes that membership's tenant permissions) |
+
+## Applications — (`app/routers/applications.py`)
+
+| Method | Path | Auth | Notes |
+|--------|------|------|-------|
+| GET | `/companies/{company_id}/applications` | perm:`application:review` | List a company's applications; lacking the permission → 403 |
+| PATCH | `/applications/{application_id}/status` | perm:`application:advance` (resolved from the application's company) | Advance pipeline stage; persists new stage, writes an audit row, emits `application.status_changed`; lacking the permission → 403 |
+
+## Moderation & verification — `/moderation` (`app/routers/verification.py`)
+
+Platform publication moderation and the shared verification state machine. Each
+action writes an audit row; illegal verification transitions → 409.
+
+| Method | Path | Auth | Notes |
+|--------|------|------|-------|
+| POST | `/moderation/jobs/{job_id}/block` | perm:`job:block` | Publication status → `flagged` (leaves public visibility) |
+| POST | `/moderation/jobs/{job_id}/unpublish` | perm:`job:unpublish` | Publication status → `inactive` |
+| POST | `/moderation/jobs/{job_id}/mark-review` | perm:`job:mark_review` | `verification_status` → `flagged` |
+| POST | `/moderation/jobs/{job_id}/verify` | perm:`job:verify` | `verification_status` → `verified` |
+| POST | `/moderation/companies/{company_id}/verify` | perm:`company:verify` | Company `verification_status` → `verified` |
+| POST | `/moderation/profiles/{profile_id}/verify` | perm:`profile:verify` | Profile `verification_status` → `verified` |
+
+## Export — `/export/v1` (`app/routers/export_api.py`)
+
+Versioned (path segment), read-only; requires a valid bearer token. 404 for a
+nonexistent identifier.
+
+| Method | Path | Auth | Notes |
+|--------|------|------|-------|
+| GET | `/export/v1/candidates/{id}` | user | Candidate as JSON Resume (resolves a `Profile` or `ProfileVersion`) |
+| GET | `/export/v1/positions/{id}` | user | Job as schema.org `JobPosting` JSON-LD (HR Open *PositionOpening*) |
+| GET | `/export/v1/jobs/{id}` | user | Alias of `/positions/{id}` (hidden from schema) |
+| GET | `/export/v1/applications/{id}` | user | Normalized Application object |
+
+## Webhook endpoints — `/webhook-endpoints` (`app/routers/webhooks_admin.py`)
+
+Outbound webhook endpoint management (distinct from inbound payment webhooks
+under `/webhooks`). The signing `secret` is never returned in responses.
+
+| Method | Path | Auth | Notes |
+|--------|------|------|-------|
+| POST | `/webhook-endpoints` | perm:`company:manage` (company from body; platform-level when `company_id` omitted) | Register an endpoint + event subscriptions; 201 |
+| GET | `/webhook-endpoints?company_id=` | perm:`company:manage` (scoped/unscoped) | List endpoints; filtered when `company_id` given |
+| DELETE | `/webhook-endpoints/{endpoint_id}` | perm:`company:manage` (endpoint's company) | Soft delete (`active = false`); keeps delivery history |
 
 ## Payments — `/payments` (`app/routers/payments.py`)
 

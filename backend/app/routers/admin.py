@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
@@ -21,10 +22,52 @@ from app.services.model_utils import (
     utcnow,
 )
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/admin", tags=["admin"])
 
 VALID_STATUSES = {"pending", "active", "flagged", "inactive", "filled"}
 VALID_RESOLUTIONS = {"pending", "reviewed", "dismissed", "job_removed"}
+
+
+def _emit_job_published(db: Any, job: Any) -> None:
+    """Emit the ``job.published`` webhook event for *job* (R20.1).
+
+    Called after a job becomes ``active`` and the transition is persisted.
+    Emission is fully guarded: the webhook service may not be wired yet and any
+    emission failure is logged and swallowed so it never breaks job publication
+    (R16.7-style guarantee).
+    """
+    from app.models.enums import WebhookEvent
+
+    payload = {
+        "id": str(get_attr(job, "id", default="") or ""),
+        "company_id": (
+            str(get_attr(job, "company_id", "companyId"))
+            if get_attr(job, "company_id", "companyId") is not None
+            else None
+        ),
+        "title": get_attr(job, "title"),
+        "status": get_attr(job, "status"),
+        "country": get_attr(job, "country"),
+        "published_at": (
+            published.isoformat()
+            if (published := get_attr(job, "published_at", "publishedAt")) is not None
+            and hasattr(published, "isoformat")
+            else get_attr(job, "published_at", "publishedAt")
+        ),
+    }
+
+    try:
+        from app.services.webhooks import emit
+    except ImportError:
+        logger.warning("Webhook service unavailable; skipped job.published emission for job %s", payload["id"])
+        return
+
+    try:
+        emit(db, WebhookEvent.job_published, payload)
+    except Exception:
+        logger.exception("Failed to emit job.published for job %s", payload["id"])
 
 
 def _pushdown_admin_jobs(db: Any, model: Any, status_filter: str | None) -> list[Any]:
@@ -124,12 +167,17 @@ def set_job_status(
         }
     )
     history = history[-100:]
+    previous_status = get_attr(job, "status")
     set_attr(job, payload.status, "status")
     set_attr(job, history, "status_history", "statusHistory")
+    becomes_published = payload.status == "active" and previous_status != "active"
     if payload.status == "active" and get_attr(job, "published_at", "publishedAt") is None:
         set_attr(job, utcnow(), "published_at", "publishedAt")
     set_attr(job, utcnow(), "updated_at", "updatedAt")
-    return {"job_id": job_id, "status": get_attr(save(db, job), "status")}
+    saved = save(db, job)
+    if becomes_published:
+        _emit_job_published(db, saved)
+    return {"job_id": job_id, "status": get_attr(saved, "status")}
 
 
 @router.patch("/jobs/bulk-status", response_model=BulkStatusResult)
@@ -157,9 +205,15 @@ def bulk_set_status(
             }
         )
         set_attr(job, history[-100:], "status_history", "statusHistory")
+        previous_status = get_attr(job, "status")
         set_attr(job, payload.status, "status")
+        becomes_published = payload.status == "active" and previous_status != "active"
+        if payload.status == "active" and get_attr(job, "published_at", "publishedAt") is None:
+            set_attr(job, utcnow(), "published_at", "publishedAt")
         set_attr(job, utcnow(), "updated_at", "updatedAt")
-        save(db, job)
+        saved = save(db, job)
+        if becomes_published:
+            _emit_job_published(db, saved)
         updated += 1
     return BulkStatusResult(requested=len(payload.job_ids), updated=updated)
 

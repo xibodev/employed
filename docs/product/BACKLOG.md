@@ -27,6 +27,22 @@ tracks the work to remove them.
 | BL-001 | **CARTO-002:** extend the `deploy-uat.yml` env upsert with `FRONTEND_BASE_URL`, `NEXT_PUBLIC_APP_URL`, `CORS_ORIGINS`, `ENVIRONMENT`, `SENTRY_DSN`, `SENTRY_ENVIRONMENT`. **Resolved on branch 2026-06-11** — upsert block extended (validated: YAML parse + `bash -n` on the deploy script); `SENTRY_DSN` reads the optional `EMPLOYED_UAT_SENTRY_DSN` secret (empty-safe). Pending merge + deploy to take effect on Box 3. | `tested_locally` | engineering | `architecture/repo-map.json` CARTO-002; `.github/workflows/deploy-uat.yml` upsert block this commit |
 | BL-002 | Set `CORS_ORIGINS` to the **exact frontend origins** in every deployed env before cookie-auth (EMP-006) ships. **UAT covered by BL-001** (workflow upserts the three `*.employed.xibodev.com` origins); remains an operator checklist item for any future env (prod) whose origins differ. | `planned` (UAT covered) | operator | `fix-execution/execution-report.json` operator actions; BL-001 upsert |
 
+## P1 — hiring-platform evolution (multi-tenant-hiring-platform spec)
+
+The trust-centric, integration-ready hiring platform (multi-tenancy, two-layer
+RBAC, verification + trust badges, version-controlled profiles, applications
+pipeline, audit trail, webhooks, versioned export API) is implemented across the
+backend (migrations `003`–`005`; new models/services/routers) and the frontend
+tenant/hiring surfaces. Remaining work to close the spec:
+
+| ID | Item | Status | Owner | Source / evidence |
+|---|---|---|---|---|
+| MTH-001 | Frontend lint/typecheck + component tests for the new tenant/hiring segments (company dashboard, members, verification status, applications list+kanban); ESLint zero-warnings, `tsc --noEmit`, list/kanban parity test | `in_progress` | engineering | tasks.md 18.5 |
+| MTH-002 | Confirm **arq (not Celery)** for server-side PDF resume rendering (DD-7 deviation flagged in design — R14.2 names Celery; the codebase has no Celery). Behavior is implemented on arq; needs product/operator sign-off | `planned` | engineering | design.md DD-7 |
+| MTH-003 | Pin an HTML→PDF engine (`weasyprint`/`xhtml2pdf`) in `requirements-api.txt` for richer resume PDFs; today `resume_templates._html_to_pdf` uses an engine if installed and otherwise a self-contained text-PDF fallback | `planned` | engineering | `backend/app/services/resume_templates.py` module docstring |
+| MTH-004 | Optionally make `RESUME_ARTIFACT_DIR` an explicit, persisted volume in deploy compose (defaults to a system temp subdir today) | `planned` | operator | `docs/architecture/CONFIG_AND_SECRETS_MAP.md` |
+| MTH-005 | Cross-market companies (Open Decision 2 deferred): a `Company` is single-market today. Revisit if a tenant needs to span `mz`/`mx` | `planned` | product | design.md Open Decision 2 |
+
 ## P1 — unblock the in-flight release / open decisions
 
 | ID | Item | Status | Owner | Source / evidence |

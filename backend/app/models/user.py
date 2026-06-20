@@ -42,6 +42,12 @@ class User(Base):
         default=dict,
         server_default=sa.text("'{}'::jsonb"),
     )
+    external_refs: Mapped[dict[str, Any]] = mapped_column(
+        MutableDict.as_mutable(JSONB),
+        nullable=False,
+        default=dict,
+        server_default=sa.text("'{}'::jsonb"),
+    )
     is_developer: Mapped[bool] = mapped_column(
         sa.Boolean,
         nullable=False,

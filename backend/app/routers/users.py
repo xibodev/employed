@@ -11,6 +11,7 @@ from app.auth.jwt import create_verification_token
 from app.database import get_db
 from app.middleware.rate_limit import rate_limit
 from app.schemas.auth import MessageResponse
+from app.schemas.memberships import MyMembershipRead
 from app.schemas.users import AccountDeletionResponse, UserExport, UserRead
 from app.services.email import send_verification_email
 from app.services.model_utils import (
@@ -74,6 +75,40 @@ def _query_by_reporter(db: Any, model: Any, user_id: Any) -> list[Any]:
 @router.get("/me", response_model=UserRead)
 def me(current_user: Any = Depends(get_current_user)):
     return _serialize_user(current_user)
+
+
+@router.get("/me/memberships", response_model=list[MyMembershipRead])
+def my_memberships(db: Any = Depends(get_db), current_user: Any = Depends(get_current_user)):
+    """List the companies the authenticated user belongs to (R2.11, R1.6).
+
+    Server-fed source for the frontend tenant switcher: returns one row per
+    Membership joined with its Company, flattened to the active-company shape
+    (company id/name/slug/market plus the user's role/status). Kept separate
+    from market resolution — tenant is an orthogonal axis.
+    """
+    from app.models.company import Company
+    from app.models.membership import Membership
+
+    user_id = get_user_id(current_user)
+    rows = (
+        db.query(Membership, Company)
+        .join(Company, Company.id == Membership.company_id)
+        .filter(Membership.user_id == user_id)
+        .order_by(Company.name)
+        .all()
+    )
+    return [
+        MyMembershipRead(
+            id=company.id,
+            name=company.name,
+            slug=company.slug,
+            market=getattr(company.market, "value", company.market),
+            role=membership.role,
+            status=membership.status,
+            membership_id=membership.id,
+        )
+        for membership, company in rows
+    ]
 
 
 @router.get("/me/export", response_model=UserExport, dependencies=[Depends(rate_limit(5, 3600, "user_export"))])

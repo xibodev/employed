@@ -52,6 +52,18 @@ runtime config. Backend reads everything through `backend/app/config.py`
 | `RECAPTCHA_BYPASS_IN_DEVELOPMENT` | false | honored only when `ENVIRONMENT` is development/testing | no |
 | `IP_SALT` | unset | salted hashing of reporter IPs and payer MSISDNs | **yes** |
 
+## Backend — hiring platform (multi-tenant-hiring-platform spec)
+
+| Var | Default | Consumer | Secret? |
+|-----|---------|----------|---------|
+| `RESUME_ARTIFACT_DIR` | unset → `<system temp>/employed-resume-artifacts` | `app/services/resume_templates.py#default_artifact_dir` — directory the arq `render_resume_pdf` task writes downloadable PDF artifacts to (R14.3). Optional; the worker is functional without it | no |
+
+> The outbound-webhook delivery knobs (`WEBHOOK_BACKOFF_BASE_SECONDS`,
+> `WEBHOOK_BACKOFF_CAP`, `WEBHOOK_MAX_ATTEMPTS`,
+> `WEBHOOK_DELIVERY_TIMEOUT_SECONDS`) are **module constants** in
+> `app/workers/tasks.py`, **not** environment variables — do not add them to
+> `.env`. The export API version is a path segment (`/export/v1`), not config.
+
 ## Backend — email
 
 > **Planned migration — Resend → AWS SES (config-level, not in code yet).**

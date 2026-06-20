@@ -19,6 +19,11 @@ class JobCreate(BaseModel):
     salary_max: int | None = Field(default=None, ge=0)
     salary_currency: str | None = None
     salary_period: str | None = None
+    # When set, the job is posted on behalf of this company (R4.4). The platform
+    # only honours it when the caller holds the job:post permission in that
+    # company; otherwise the request is rejected (R4.5). A null value keeps the
+    # job as a legacy/anonymous listing (R4.3).
+    company_id: str | None = None
     recaptcha_token: str | None = None
 
 

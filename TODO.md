@@ -47,6 +47,26 @@
 - [ ] Confirm M-Pesa / e-Mola sandbox credentials before any mobile-money UAT
       journey that claims real provider coverage.
 
+## 🟢 Engineering — hiring-platform evolution (multi-tenant-hiring-platform spec)
+
+The trust-centric hiring platform (multi-tenant companies/memberships, two-layer
+RBAC, verification + trust badges, version-controlled profiles, applications
+pipeline, audit trail, webhooks, versioned `/export/v1` API; migrations
+`003`–`005`) is implemented backend + frontend. Outstanding:
+
+- [ ] Frontend lint/typecheck + component tests for the new tenant/hiring
+      segments (company dashboard, members, verification status, applications
+      list+kanban) — ESLint zero-warnings, `tsc --noEmit`, list/kanban parity
+      (tasks.md 18.5). → BACKLOG MTH-001
+- [ ] Sign off the **arq-not-Celery** decision for PDF resume rendering (DD-7
+      deviation: R14.2 names Celery; the stack has no Celery). → MTH-002
+- [ ] Pin an HTML→PDF engine (`weasyprint`/`xhtml2pdf`) in `requirements-api.txt`
+      for richer resume PDFs (text-PDF fallback today). → MTH-003
+- [ ] Decide whether `RESUME_ARTIFACT_DIR` needs a persisted deploy volume
+      (defaults to a system temp subdir). → MTH-004
+- [ ] Final spec checkpoint: ensure the full backend + frontend test suites pass
+      (tasks.md 20).
+
 ## 🟢 Engineering — UAT CI/CD hardening (toward a prod-ready pipeline)
 
 - [ ] Gate deploy on CI — `deploy-uat.yml` currently races `ci.yml` and a red CI

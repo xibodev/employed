@@ -1,15 +1,15 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
 import sqlalchemy as sa
-from sqlalchemy.dialects.postgresql import ARRAY, UUID as PGUUID
-from sqlalchemy.ext.mutable import MutableList
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB, UUID as PGUUID
+from sqlalchemy.ext.mutable import MutableDict, MutableList
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
-from app.models.enums import ProfileStatus, ProfileType, pg_enum
+from app.models.enums import ProfileStatus, ProfileType, VerificationState, pg_enum
 
 if TYPE_CHECKING:
     from app.models.user import User
@@ -56,5 +56,18 @@ class Profile(Base):
         server_default=sa.text("'pending'"),
     )
     random_sorter: Mapped[float | None] = mapped_column(sa.Float)
+    json_resume: Mapped[dict[str, Any] | None] = mapped_column(MutableDict.as_mutable(JSONB))
+    verification_status: Mapped[VerificationState] = mapped_column(
+        pg_enum(VerificationState, "verificationstate"),
+        nullable=False,
+        default=VerificationState.unverified,
+        server_default=sa.text("'unverified'"),
+    )
+    external_refs: Mapped[dict[str, Any]] = mapped_column(
+        MutableDict.as_mutable(JSONB),
+        nullable=False,
+        default=dict,
+        server_default=sa.text("'{}'::jsonb"),
+    )
 
     user: Mapped[User] = relationship(back_populates="profile")

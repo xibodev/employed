@@ -16,7 +16,9 @@ Frontend is in `frontend/`; backend is in `backend/`.
    `NEXT_PUBLIC_APP_URL`, `FRONTEND_BASE_URL`. (Email goes through the Resend
    SMTP relay: `SMTP_PASSWORD` carries the Resend API key — there is no
    `RESEND_API_KEY` var in the app env.) Full map:
-   `docs/architecture/CONFIG_AND_SECRETS_MAP.md`.
+   `docs/architecture/CONFIG_AND_SECRETS_MAP.md`. The hiring platform adds one
+   optional var, `RESUME_ARTIFACT_DIR` (PDF artifact output dir); the webhook
+   backoff knobs are module constants, not env vars.
 5. **Secrets posture** — never commit `.env`. See `deploy/.env.example` and `frontend/.env.example`.
 6. **Port allocation** — frontend defaults to `localhost:3000`, backend to `localhost:8000`, MailHog to `8025` when used.
 
@@ -26,10 +28,49 @@ Frontend is in `frontend/`; backend is in `backend/`.
 - `backend/app/main.py` — FastAPI app entrypoint
 - `backend/app/config.py` — backend settings
 - `backend/app/routers/` — API route modules
+- `backend/app/services/` — business logic (RBAC, verification, trust, companies, memberships, applications, webhooks, export)
 - `backend/app/models/` — SQLAlchemy models
 - `frontend/src/lib/api.ts` — frontend API base URL handling
 - `frontend/src/lib/market.ts` — hostname/subdomain market resolution
+- `frontend/src/lib/tenant.ts` — active company (tenant) context, kept separate from market
 - `tests/README.md` — current testing guidance
+
+## Hiring-platform conventions (multi-tenant-hiring-platform spec)
+
+The job board is evolving into a trust-centric, integration-ready hiring
+platform. New work follows these conventions:
+
+1. **Layering.** New API routes go in `routers/` (one module per domain) and are
+   wired in `main.py`; business logic lives in `services/`; validation in
+   `schemas/`. Models extend `Base` in `models/`; enums use the `pg_enum` helper
+   in `models/enums.py`.
+2. **Authorization is permission-based (two-layer RBAC).** Check for a
+   *permission* string (e.g. `job:moderate`), never a role name, via
+   `services/rbac.py#require_permission`. Effective permissions = platform-role
+   permissions (across all tenants) ∪ the **active** membership's tenant-role
+   permissions in the resource's company. `invited`/`suspended` memberships grant
+   none. See `docs/architecture/RBAC_AND_TENANCY.md`.
+3. **Market vs tenant are orthogonal.** Market is resolved from the hostname;
+   tenant (Company) is resolved from the target resource + the user's membership.
+   Never derive one from the other.
+4. **Verification is one shared state machine.** Route all verification
+   transitions through `services/verification.py#transition` (it validates,
+   reconciles trust badges, and writes one audit row atomically). Trust is a set
+   of named badges, not a numeric score.
+5. **Audit + profile versions are append-only.** Write privileged/verification/
+   moderation actions via `services/audit.py`; never add an update/delete path —
+   `AuditLog` and `ProfileVersion` have `before_update` guards that raise.
+6. **Background work uses arq, not Celery.** PDF resume rendering and webhook
+   delivery are arq tasks in `app/workers/tasks.py`. Webhook delivery retries use
+   bounded exponential backoff via **module constants** (not env vars).
+7. **Standard schemas at boundaries.** Use the pure mappers in `services/export.py`
+   (JSON Resume, schema.org `JobPosting` JSON-LD, normalized Application). Every
+   major entity has an `external_refs` JSONB field — map external ids there, never
+   via a migration. The export API is versioned in the path (`/export/v1`).
+8. **Migrations are append-only.** The tenancy/RBAC schema is migration `003`;
+   data migrations are `004` (legacy admins → `platform_super_admin`) and `005`
+   (legacy company profiles → companies, `status_history` → audit). Add new
+   revisions; never edit `001`–`005`. See `docs/architecture/MIGRATION_STRATEGY.md`.
 
 ## Commands
 

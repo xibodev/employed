@@ -8,11 +8,11 @@ from uuid import UUID
 
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import JSONB, UUID as PGUUID
-from sqlalchemy.ext.mutable import MutableList
+from sqlalchemy.ext.mutable import MutableDict, MutableList
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
-from app.models.enums import Country, JobStatus, JobType, SalaryCurrency, SalaryPeriod, pg_enum
+from app.models.enums import Country, JobStatus, JobType, SalaryCurrency, SalaryPeriod, VerificationState, pg_enum
 
 # Recommended indexes for common query patterns:
 # - ix_jobs_status_country_created_at(status, country, created_at) for the primary jobs listing query.
@@ -31,6 +31,7 @@ class Job(Base):
     __table_args__ = (
         sa.Index("idx_jobs_status_country_created", "status", "country", sa.text("created_at DESC")),
         sa.Index("idx_jobs_user_id", "user_id"),
+        sa.Index("ix_jobs_company_id", "company_id"),
         sa.Index(
             "idx_jobs_featured",
             "featured_through",
@@ -53,6 +54,10 @@ class Job(Base):
     user_id: Mapped[UUID | None] = mapped_column(
         PGUUID(as_uuid=True),
         sa.ForeignKey("users.id", ondelete="SET NULL"),
+    )
+    company_id: Mapped[UUID | None] = mapped_column(
+        PGUUID(as_uuid=True),
+        sa.ForeignKey("companies.id", ondelete="SET NULL"),
     )
     title: Mapped[str] = mapped_column(sa.String(256), nullable=False)
     company: Mapped[str | None] = mapped_column(sa.String(256))
@@ -96,6 +101,18 @@ class Job(Base):
     published_at: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
     expired_at: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
     recaptcha_score: Mapped[float | None] = mapped_column(sa.Float)
+    verification_status: Mapped[VerificationState] = mapped_column(
+        pg_enum(VerificationState, "verificationstate"),
+        nullable=False,
+        default=VerificationState.unverified,
+        server_default=sa.text("'unverified'"),
+    )
+    external_refs: Mapped[dict[str, Any]] = mapped_column(
+        MutableDict.as_mutable(JSONB),
+        nullable=False,
+        default=dict,
+        server_default=sa.text("'{}'::jsonb"),
+    )
 
     user: Mapped[User | None] = relationship(back_populates="jobs")
     payment_intents: Mapped[list[PaymentIntent]] = relationship(

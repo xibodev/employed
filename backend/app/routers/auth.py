@@ -460,6 +460,47 @@ async def logout(request: Request, response: Response) -> MessageResponse:
     return MessageResponse(message="Logged out")
 
 
+def _apply_verified_domain_memberships(db: Any, user: Any) -> None:
+    """Link a just-verified user to companies that own their email domain (R3.2/3.3).
+
+    On email verification, match the verified email's domain against each
+    Company's ``verified_email_domains`` and apply the idempotent domain
+    auto-membership policy, which creates an ``invited`` membership requiring
+    manual approval (R3.3) and records an audit entry.
+
+    Best-effort: the email-verification flow must succeed even if the Company
+    model is unavailable (e.g. the SQLite-backed test rig has no ``companies``
+    table) or the containment query fails. Any failure is logged and swallowed.
+    """
+    try:
+        email = get_primary_email(user)
+        if not email or "@" not in email:
+            return
+        domain = email.rsplit("@", 1)[-1].strip().lower()
+        if not domain:
+            return
+
+        Company = resolve_model("Company")
+        from app.services.memberships import apply_domain_auto_membership
+
+        companies = (
+            db.query(Company)
+            .filter(Company.verified_email_domains.contains([domain]))
+            .all()
+        )
+        if not companies:
+            return
+        for company in companies:
+            apply_domain_auto_membership(db, company=company, user=user)
+        db.commit()
+    except Exception:  # noqa: BLE001 - never let auto-membership break verification
+        logger.warning("domain auto-membership skipped for verified email", exc_info=True)
+        try:
+            db.rollback()
+        except Exception:  # noqa: BLE001
+            logger.debug("rollback after domain auto-membership failure also failed", exc_info=True)
+
+
 @router.post("/verify-email/{token}", response_model=TokenStatusResponse)
 def verify_email(token: str, db: Any = Depends(get_db)):
     try:
@@ -484,6 +525,7 @@ def verify_email(token: str, db: Any = Depends(get_db)):
                 setattr(first, "verified", True)
             set_attr(user, emails, "emails")
     save(db, user)
+    _apply_verified_domain_memberships(db, user)
     return TokenStatusResponse(message="Email verified", verified_at=utcnow())
 
 

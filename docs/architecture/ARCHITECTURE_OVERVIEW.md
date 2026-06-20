@@ -11,6 +11,18 @@ jobs, candidates browse localized listings, admins moderate listings before
 they go live. Featured-listing payments via Stripe (live-capable) and
 M-Pesa/e-Mola (simulator by default).
 
+> **Hiring-platform evolution (multi-tenant-hiring-platform spec).** The board
+> is evolving into a trust-centric, integration-ready hiring platform —
+> *"more than a job board, less than a heavy ATS."* It adds multi-tenancy
+> (`Company` + `Membership`), a two-layer permission-based RBAC model, a reusable
+> verification state machine with composable trust badges, version-controlled
+> JSON Resume profiles, a first-class `Application` pipeline, an append-only
+> audit trail, outbound webhooks, and a versioned export API exposing standard
+> schemas (JSON Resume, schema.org `JobPosting`). Market and tenant are
+> orthogonal axes. Details: `docs/architecture/RBAC_AND_TENANCY.md`,
+> `VERIFICATION_AND_TRUST.md`, `INTEGRATION_AND_EXPORT.md`,
+> `MIGRATION_STRATEGY.md`, and the expanded `DATA_MODEL.md`/`API_MAP.md`.
+
 ## System shape
 
 ```

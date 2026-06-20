@@ -8,6 +8,7 @@ import Header from "@/components/layout/Header";
 import { RuntimeEnvScript } from "@/components/layout/RuntimeEnvScript";
 import { AuthProvider } from "@/hooks/useAuth";
 import { MarketProvider } from "@/hooks/useMarket";
+import { TenantBootstrap } from "@/components/tenant/TenantBootstrap";
 import { resolveMarketFromHeaders } from "@/lib/market";
 import { buildMetadata } from "@/lib/seo";
 
@@ -37,11 +38,13 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
         <NextIntlClientProvider messages={messages}>
           <MarketProvider initialMarket={market}>
             <AuthProvider>
-              <div className="flex min-h-screen flex-col">
-                <Header />
-                <main className="flex-1 py-10">{children}</main>
-                <Footer />
-              </div>
+              <TenantBootstrap>
+                <div className="flex min-h-screen flex-col">
+                  <Header />
+                  <main className="flex-1 py-10">{children}</main>
+                  <Footer />
+                </div>
+              </TenantBootstrap>
             </AuthProvider>
           </MarketProvider>
         </NextIntlClientProvider>

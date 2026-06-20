@@ -111,3 +111,68 @@ export interface AuthUser {
   email?: string;
   roles?: string[];
 }
+
+// --- Multi-tenant hiring platform (companies / memberships / verification) ---
+
+/** Verification lifecycle state (mirrors backend `VerificationState`). */
+export type VerificationState =
+  | "unverified"
+  | "pending"
+  | "verified"
+  | "rejected"
+  | "revoked"
+  | "flagged";
+
+/** Tenant-scoped role carried by a Membership (mirrors backend `TenantRole`). */
+export type TenantRoleValue = "org_owner" | "org_admin" | "recruiter" | "member";
+
+/** Membership lifecycle status (mirrors backend `MembershipStatus`). */
+export type MembershipStatusValue = "invited" | "active" | "suspended";
+
+/** Company view returned by the read/create/verify endpoints (`CompanyRead`). */
+export interface Company {
+  id: string;
+  name: string;
+  slug: string;
+  market: MarketKey;
+  description?: string | null;
+  logo_url?: string | null;
+  website?: string | null;
+  verification_status: VerificationState;
+  verified_email_domains: string[];
+  trust_badges: string[];
+  created_by?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+}
+
+/** Request body for creating a Company (market is resolved server-side). */
+export interface CompanyCreateValues {
+  name: string;
+  description?: string;
+  logo_url?: string;
+  website?: string;
+}
+
+/** Membership view returned by the invite/accept/suspend/list endpoints. */
+export interface Membership {
+  id: string;
+  user_id: string;
+  company_id: string;
+  role: TenantRoleValue;
+  status: MembershipStatusValue;
+  invited_by?: string | null;
+}
+
+/** Request body for inviting a user to a Company. */
+export interface MembershipInviteValues {
+  user_id: string;
+  role?: TenantRoleValue;
+}
+
+/** Request body for company domain verification. */
+export interface DomainVerifyValues {
+  domain: string;
+  method?: "dns" | "member_email";
+  expected_token?: string;
+}

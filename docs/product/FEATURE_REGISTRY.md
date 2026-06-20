@@ -100,6 +100,31 @@ into combined commits): **28 applied · 2 blocked (external-ops) · 1 partial ·
 
 ---
 
+## C. Hiring-platform evolution (multi-tenant-hiring-platform spec)
+
+Trust-centric, integration-ready hiring platform layered on the job board
+(*"more than a job board, less than a heavy ATS"*). Implemented across the
+backend (Alembic migrations `003`–`005`; new models, services, and routers) and
+the frontend tenant/hiring surfaces. Status `implemented` = code is present on
+the working tree with spec property/example tests; **not** independently
+re-verified against a live build in this pass. See `docs/product/POSITIONING.md`,
+`USER_TYPES_AND_JOURNEYS.md`, and the architecture bundle.
+
+| ID | Feature | Status | Owner | Evidence / notes |
+|---|---|---|---|---|
+| MTH-F-001 | Multi-tenancy: `Company` + `Membership`, owner-on-create, invite/accept/suspend, domain auto-membership | `implemented` | engineering | `models/company.py`,`membership.py`; `services/companies.py`,`memberships.py`; `routers/companies.py`,`memberships.py` |
+| MTH-F-002 | Two-layer permission-based RBAC (platform + tenant roles, `PERMISSION_CATALOG`) | `implemented` | engineering | `services/rbac.py`; guards across new routers |
+| MTH-F-003 | Verification state machine + composable trust badges; company domain verification (DNS TXT / member email) | `implemented` | engineering | `services/verification.py`,`trust.py`; `routers/verification.py` |
+| MTH-F-004 | Publication moderation (block/unpublish/mark-review/verify) + append-only audit trail | `implemented` | engineering | `routers/verification.py`; `services/audit.py`; `models/audit_log.py` |
+| MTH-F-005 | Version-controlled JSON Resume profiles + server-side PDF resume export (arq) | `implemented` | engineering | `services/profiles_versioning.py`,`resume_templates.py`; `workers/tasks.py#render_resume_pdf`; `routers/profiles.py` versions |
+| MTH-F-006 | First-class `Application` entity, email template, recruiter list+kanban pipeline | `implemented` | engineering | `models/application.py`; `services/applications.py`,`application_email.py`; `routers/applications.py` |
+| MTH-F-007 | Outbound webhooks (`job.published`,`application.created`,`application.status_changed`) with bounded backoff retry | `implemented` | engineering | `services/webhooks.py`; `workers/tasks.py#deliver_webhook`; `routers/webhooks_admin.py` |
+| MTH-F-008 | Standard schemas + `external_refs` + versioned `/export/v1` API | `implemented` | engineering | `services/export.py`,`external_refs.py`; `routers/export_api.py` |
+| MTH-F-009 | Reversible data migrations: legacy admins → `platform_super_admin`; company profiles → companies; `status_history` → audit | `implemented` | engineering | `alembic/versions/004_migrate_admins.py`,`005_migrate_legacy_profiles_and_jobs.py` |
+| MTH-F-010 | Frontend tenant context + hiring surfaces (dashboard, members, verification, applications) | `implemented` | engineering | `frontend/src/lib/tenant.ts`; new App Router segments; lint/typecheck + tests outstanding → BACKLOG MTH-001 |
+
+---
+
 ## Status-evidence rules (how this registry stays defensible)
 
 - `deployed_to_uat` requires a deploy-run id **and** a live reachability check.
