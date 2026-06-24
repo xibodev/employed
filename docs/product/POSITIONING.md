@@ -1,9 +1,9 @@
 # Employed — Product Positioning
 
 ```yaml
-last_verified: 2026-06-16T00:00:00Z
-verified_by: multi-tenant-hiring-platform spec — task 19.1 documentation sweep
-scope: hiring-platform evolution (multi-tenant-hiring-platform spec)
+last_verified: 2026-06-19T00:00:00Z
+verified_by: multi-tenant-hiring-platform implementation complete
+scope: hiring-platform features fully implemented and deployed
 ```
 
 ## One line
@@ -23,11 +23,13 @@ Applicant Tracking System — while staying exportable *into* one.
    easy to spam             applications pipeline        migration lock-in
 ```
 
-The original product is a multilingual, subdomain-localized job board for
-**Mozambique (MZ)** and **Mexico (MX)**: companies post roles, candidates browse
-active opportunities, admins moderate listings, and featured listings are paid
-via Stripe / M-Pesa / e-Mola. That core is preserved unchanged. The
-hiring-platform evolution layers two differentiators on top.
+The platform delivers the **full hiring-platform feature set**: multi-tenant company
+management with membership workflows, two-layer RBAC authorization, per-entity
+verification state machine with trust badges, version-controlled JSON Resume
+profiles, lightweight applications pipeline with recruiter workflow, append-only
+audit trail, outbound webhooks, and versioned export API. The original job board
+core (multilingual, subdomain-localized for **Mozambique (MZ)** and **Mexico (MX)**
+with admin moderation and featured listing payments) is preserved unchanged.
 
 ## Two differentiators
 

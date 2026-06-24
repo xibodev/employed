@@ -1,27 +1,23 @@
 ---
-last_verified: 2026-06-14T00:00:00Z
-git_ref: working-tree (fix/quality-run-2026-06-10 lineage; uat baseline 00aa899)
-verified_by: codebase-cartographer — FP-CARTO-007 doc refresh (2026-06-14)
+last_verified: 2026-06-19T00:00:00Z
+git_ref: uat (multi-tenant-hiring-platform complete)
+verified_by: full implementation doc refresh
 ---
 
 # Architecture Overview — Employed
 
-Multilingual job board for Mozambique (MZ) and Mexico (MX). Companies post
-jobs, candidates browse localized listings, admins moderate listings before
-they go live. Featured-listing payments via Stripe (live-capable) and
-M-Pesa/e-Mola (simulator by default).
+Trust-centric, integration-ready hiring platform for Mozambique (MZ) and Mexico (MX). More than a job board, less than a heavy ATS: companies create organizations and post jobs, candidates browse localized listings and apply through a lightweight pipeline, recruiters manage applications through configurable stages, and admins moderate content with verification workflows. Multi-tenant with two-layer RBAC, per-entity verification state machine, composable trust badges, JSON Resume profiles, outbound webhooks, and standard-schema export API. Featured-listing payments via Stripe (live-capable) and M-Pesa/e-Mola (simulator by default).
 
-> **Hiring-platform evolution (multi-tenant-hiring-platform spec).** The board
-> is evolving into a trust-centric, integration-ready hiring platform —
-> *"more than a job board, less than a heavy ATS."* It adds multi-tenancy
-> (`Company` + `Membership`), a two-layer permission-based RBAC model, a reusable
-> verification state machine with composable trust badges, version-controlled
-> JSON Resume profiles, a first-class `Application` pipeline, an append-only
-> audit trail, outbound webhooks, and a versioned export API exposing standard
-> schemas (JSON Resume, schema.org `JobPosting`). Market and tenant are
-> orthogonal axes. Details: `docs/architecture/RBAC_AND_TENANCY.md`,
-> `VERIFICATION_AND_TRUST.md`, `INTEGRATION_AND_EXPORT.md`,
-> `MIGRATION_STRATEGY.md`, and the expanded `DATA_MODEL.md`/`API_MAP.md`.
+> **Multi-tenant hiring platform implementation complete.** The platform now includes
+> all hiring platform features: `Company` entities with `Membership` management,
+> two-layer RBAC (platform + tenant permissions), verification state machine with
+> trust badges, version-controlled JSON Resume profiles, `Application` pipeline with
+> recruiter workflow, append-only audit trail, webhook system for domain events,
+> and versioned export API with standard schemas. Market (geography) and tenant
+> (organization) remain orthogonal axes. Legacy job board features are preserved
+> unchanged. Details in `RBAC_AND_TENANCY.md`, `VERIFICATION_AND_TRUST.md`,
+> `INTEGRATION_AND_EXPORT.md`, `MIGRATION_STRATEGY.md`, and the comprehensive
+> `DATA_MODEL.md`/`API_MAP.md`.
 
 ## System shape
 
@@ -30,21 +26,36 @@ M-Pesa/e-Mola (simulator by default).
     │
     ▼
  Caddy (Box 3) ──► frontend  Next.js 15 standalone     :3000 (host 3300)
+    │                 │  • tenant context management (companies/memberships)
+    │                 │  • company dashboard & member management UI
+    │                 │  • applications kanban & list views
+    │                 │  • verification status displays
     │                 │  server-side fetch + client fetch, both send
     │                 │  X-Forwarded-Host = market hostname
     ▼                 ▼
  Caddy (api.*) ──► backend   FastAPI / uvicorn          :8000 (host 3301)
-                      │
+                      │  • two-layer RBAC authorization
+                      │  • verification state machine
+                      │  • trust badge computation
+                      │  • JSON Resume profile versioning
+                      │  • webhook emission & delivery
+                      │  • export API (JSON Resume, JobPosting JSON-LD)
         ┌─────────────┼──────────────┐
         ▼             ▼              ▼
    PostgreSQL 16   Redis 7      arq worker (same image as backend)
    (SQLAlchemy 2)  (queue, rate limit, lockout,   cron: expire jobs,
-                    JTI revocation, webhook       delete scheduled accounts,
-                    replay dedupe)                settle simulated intents
+   + new tables:    JTI revocation, webhook       delete scheduled accounts,
+   companies,       replay dedupe, worker         settle simulated intents,
+   memberships,     task queue)                   PDF resume rendering,
+   applications,                                  webhook delivery + retry
+   audit_logs,
+   profile_versions,
+   webhook_*
 ```
 
 Sources: `deploy/docker-compose.prod.yml`, `backend/app/main.py`,
-`backend/app/workers/`, `frontend/src/lib/api.ts`.
+`backend/app/workers/`, `frontend/src/lib/api.ts`, migration files
+`003_rbac_and_tenancy.py`, `004_migrate_admins.py`, `005_migrate_legacy_profiles_and_jobs.py`.
 
 ## Market & locale resolution (core invariant)
 
@@ -92,6 +103,39 @@ Plus global handlers: 422 validation shaping, 500 catch-all (no internals
 leaked). `/health` (GET+HEAD) checks DB and Redis with 2 s timeouts and
 returns 503 with `{"status": "degraded"}` on component failure.
 
+## Authorization model (two-layer RBAC)
+
+Source: `backend/app/services/rbac.py`, `backend/app/models/enums.py`,
+`backend/app/services/companies.py`, `backend/app/services/memberships.py`.
+
+The platform implements a **two-layer Role-Based Access Control (RBAC)** system with atomic permissions as the authorization primitive:
+
+### Platform Layer (cross-tenant)
+- **platform_super_admin**: Full platform access across all tenants
+- **platform_moderator**: Content moderation and verification permissions  
+- **platform_support**: Read-only support access
+
+### Tenant Layer (company-scoped)
+- **org_owner**: Full company management (created automatically with company)
+- **org_admin**: Company administration excluding ownership transfer
+- **recruiter**: Job posting and application management
+- **member**: View-only access to company resources
+
+### Permission Resolution
+1. **Tenant scope resolution**: Determined from target resource's `company_id`
+2. **Effective permissions**: `platform_permissions ∪ active_tenant_permissions`
+3. **Authorization check**: Action allowed if required permission ∈ effective permissions
+4. **Suspended memberships**: Grant zero tenant permissions regardless of role
+5. **Independence**: Either platform OR tenant permissions can authorize an action
+
+### Key Permissions
+- `job:post`, `job:moderate`, `job:verify` — Job management
+- `company:verify`, `company:manage_members` — Company operations  
+- `profile:verify`, `user:suspend` — User management
+- `platform_user:create`, `platform_role:assign` — Platform administration
+
+The `require_permission(permission_name)` FastAPI dependency handles all authorization checks, resolving tenant scope from path/body parameters and raising 403 on insufficient permissions.
+
 ## Authentication model
 
 Source: `backend/app/routers/auth.py`, `backend/app/auth/`,
@@ -125,16 +169,95 @@ Source: `backend/app/routers/auth.py`, `backend/app/auth/`,
   `users.email`, lowercase-normalized on write; JSONB containment for
   `oauth_providers`) — no full-table Python scans (EMP-005).
 
-## Job lifecycle & moderation
+## Company & membership management
+
+Source: `backend/app/services/companies.py`, `backend/app/services/memberships.py`,
+`frontend/src/components/company/`, `frontend/src/contexts/TenantContext.tsx`.
+
+### Company Creation & Management
+- **Company entity**: name, slug (unique per market), description, logo, website, verification status
+- **Automatic owner membership**: Creating a company grants `org_owner` + `active` membership
+- **Domain verification**: DNS TXT records or matching member emails → `domain verified` trust badge
+- **Market scoping**: Each company belongs to one market (MX or MZ)
+- **External references**: JSONB field for mapping to external system IDs
+
+### Membership Lifecycle
+- **Invitation flow**: `company:manage_members` → create `invited` membership → accept → `active`
+- **Role assignment**: `org_owner`, `org_admin`, `recruiter`, `member` with different permission sets
+- **Status management**: `invited` → `active` → `suspended` (suspended = zero tenant permissions)
+- **Domain auto-membership**: Users with verified emails matching company domains get auto-invited
+- **Multi-company support**: Users can hold memberships in multiple companies
+
+### Frontend Integration
+- **Tenant context**: Separate from market context, manages active company selection
+- **Company switcher**: UI for users with multiple company memberships
+- **Company dashboard**: Verification status, member management, domain verification workflow
+- **Member management**: Invite, accept, suspend interfaces with permission guards
+
+## Verification & trust system
+
+Source: `backend/app/services/verification.py`, `backend/app/services/trust.py`,
+`backend/app/routers/verification.py`.
+
+### Verification State Machine
+Single reusable state machine for Company, User identity, Profile, and Job entities:
+- **States**: `unverified` → `pending` → `verified`/`rejected`/`revoked`/`flagged`
+- **Transitions**: Governed by permission checks (`company:verify`, `job:verify`, etc.)
+- **Audit trail**: Every transition writes an append-only audit log entry
+- **Atomic operations**: State change + badge reconciliation + audit logging in single transaction
+
+### Trust Badges (Composable)
+- **Company badges**: `email verified`, `domain verified`, `business-document verified`, `payment verified`, `activity`
+- **Job badges**: `posted by verified company`, `salary disclosed`, `responsive`  
+- **Profile badges**: `email verified`, `identity verified`, `phone verified`
+- **Derivation**: Pure function computes badges from current entity conditions
+- **Reconciliation**: Attach badges when conditions hold, remove when conditions cease
+
+### Domain Verification Flow
+1. **DNS TXT method**: Place verification token in `_employed-verify.domain.com` TXT record
+2. **Email match method**: Active company members with verified `@domain.com` emails
+3. **Success**: `domain verified` badge + add to company's `verified_email_domains` list
+4. **Retry logic**: Badge attachment failure retries domain list update
+
+## Application pipeline & profile versioning
+
+Source: `backend/app/services/applications.py`, `backend/app/services/profiles_versioning.py`,
+`backend/app/services/application_email.py`, `frontend/src/components/applications/`.
+
+### Profile Versioning (JSON Resume)
+- **Live profile**: Single working-copy Profile per user using JSON Resume schema
+- **Immutable snapshots**: `save_version()` creates append-only ProfileVersion records
+- **Version integrity**: ProfileVersions cannot be modified after creation (DB + service guards)
+- **Application linking**: Applications reference specific ProfileVersion for resume data
+- **Export compatibility**: JSON Resume format ensures ATS import compatibility
+
+### Application Entity & Pipeline
+- **Tracked applications**: First-class Application records with `applied` → `reviewed` → `shortlisted` → `rejected` → `hired` stages
+- **Candidate references**: Either `candidate_user_id` (registered users) or `candidate_snapshot` (JSON Resume blob)
+- **Dual channels**: Tracked pipeline (default) + email-apply (always available, no silent fallback)
+- **Email templates**: Token substitution for `job_title`, `company`, `candidate_name`
+- **Webhook emission**: `application.created` and `application.status_changed` events
+
+### Recruiter Workflow
+- **Permission gating**: Application access requires active membership with appropriate permissions
+- **Multiple views**: List view (table) and kanban board (drag-drop status changes)
+- **Status advancement**: Controlled progression through pipeline stages with audit trail
+- **Company scoping**: Recruiters see only applications for their company's jobs
+- **Audit logging**: Every status change creates audit trail entry + webhook emission
+
+## Job lifecycle & moderation (enhanced)
 
 - Statuses: `pending → active → filled | inactive` (+ `flagged`); enum in
   `backend/app/models/enums.py`.
+- **Company posting**: Jobs can be posted on behalf of companies (requires `job:post` permission), setting `company_id`; legacy anonymous jobs have `null company_id`
+- **Trust integration**: Jobs posted by verified companies receive `posted by verified company` trust badge
 - Anonymous submissions require reCAPTCHA v3 with the enforced action
   `submit_job` and min score `RECAPTCHA_MIN_SCORE` (EMP-002/003);
   authenticated submitters must be email-verified.
 - Non-active listings (including contact details) are visible only to the
   owner or admins; owner edits of an active listing reset it to `pending`
   for re-moderation (EMP-008).
+- **Verification workflow**: Jobs have `verification_status` field managed by verification state machine
 - 90-day expiry by the worker cron (`expire_old_jobs`, every 6 h): status →
   `inactive` with reason `expired` recorded in `status_history` and
   `expired_at` set (EMP-017).
@@ -146,6 +269,54 @@ Source: `backend/app/routers/auth.py`, `backend/app/auth/`,
   (EMP-004). Current relay is **Resend SMTP** via the `xibodev.com` apex
   sender; the portfolio standard (and planned target) is **AWS SES** — see
   the External services narrative below.
+
+## Webhook system & integration API
+
+Source: `backend/app/services/webhooks.py`, `backend/app/routers/webhooks_admin.py`,
+`backend/app/routers/export_api.py`, `backend/app/workers/tasks.py`.
+
+### Outbound Webhooks
+- **Event types**: `job.published`, `application.created`, `application.status_changed`
+- **Registration**: Companies register webhook endpoints with event subscriptions
+- **Fan-out**: Events deliver to ALL subscribed endpoints, none to unsubscribed endpoints  
+- **Reliability**: Delivery via arq worker with exponential backoff retry policy
+- **Security**: HMAC signature verification + timestamp validation + replay protection
+- **Isolation**: Webhook delivery failures never roll back the triggering database transaction
+
+### Webhook Delivery Worker
+- **Retry policy**: Exponential backoff `min(2^attempt * 30s, 6h)` with attempt cap
+- **Failure tracking**: Attempts count, next_attempt_at scheduling, terminal `failed` state
+- **Error capture**: Last error message stored for debugging failed deliveries
+
+### Export API (Versioned, Read-Only)
+- **URL versioning**: `/api/export/v1/candidates/{id}` format allows API evolution
+- **JSON Resume export**: Candidate profiles returned in standard JSON Resume format
+- **JobPosting JSON-LD**: Jobs mapped to schema.org JobPosting structured data
+- **Stable identifiers**: UUID `id` fields serve as public, stable entity identifiers
+- **404 handling**: Nonexistent entities return proper 404 responses
+- **HR Open Standards alignment**: Vocabulary aligned with industry standards where feasible
+
+### External References (Migration-Free Integration)
+- **JSONB storage**: `external_refs` field on Company, Job, Profile, User, Application entities
+- **No-migration mapping**: Store external system IDs without schema changes
+- **Round-trip guarantee**: Data written to `external_refs` loads identically
+- **Integration pattern**: Enables bidirectional sync with external ATS systems
+
+## Audit trail & compliance
+
+Source: `backend/app/services/audit.py`, `backend/app/models/audit_log.py`.
+
+### Comprehensive Audit Logging
+- **Scope**: All privileged, verification, moderation, and membership actions
+- **Data capture**: Actor (user or system), action type, target entity, before/after state, timestamp
+- **Append-only design**: AuditLog records can never be updated or deleted
+- **System actors**: Support for both user actors (`actor_id`) and system processes (`actor_label`)
+- **Immutability guards**: Database-level `before_update` triggers prevent tampering
+
+### Legacy Migration
+- **Status history conversion**: Existing `Job.status_history` JSONB migrated to structured audit entries
+- **Preservation**: All historical data preserved during migration with full reversibility
+- **Audit trail continuity**: Seamless transition from legacy status tracking to comprehensive audit logging
 
 ## Payments
 
@@ -186,7 +357,7 @@ Source: `backend/app/routers/payments.py`, `backend/app/payments/`,
   job-detail, account, my-jobs and post-job surfaces (EMP-027).
 - CSP + security headers in `next.config.ts`.
 
-## Background processing
+## Background processing (enhanced)
 
 `arq` worker (same image as the API, command
 `arq app.workers.config.WorkerSettings`):
@@ -196,6 +367,13 @@ Source: `backend/app/routers/payments.py`, `backend/app/payments/`,
 | `expire_old_jobs` | cron hours 0/6/12/18 | active jobs >90 days → inactive (+history/`expired_at`) |
 | `delete_scheduled_accounts` | cron hour 3 | hard-delete accounts past their 30-day deletion window |
 | `settle_simulated_intent` | enqueued | settles simulator-mode mobile-money intents |
+| `render_resume_pdf` | enqueued | server-side PDF rendering from ProfileVersion + template |
+| `deliver_webhook` | enqueued | webhook delivery with exponential backoff retry |
+
+**New hiring platform tasks**:
+- **PDF resume rendering**: Generates downloadable resumes from JSON Resume ProfileVersions using predefined templates
+- **Webhook delivery**: Reliable outbound HTTP notifications with retry logic for integration events
+- **Enhanced audit trail**: All worker actions write audit log entries for compliance tracking
 
 Worker is importable without `REDIS_URL` (falls back to a local DSN default,
 EMP-017 follow-up); prod compose gives it a Redis-ping healthcheck instead of
