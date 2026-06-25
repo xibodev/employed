@@ -76,6 +76,9 @@ jobs:
   deploy:
     needs: [build-backend, build-frontend]
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
     steps:
       - uses: actions/checkout@v4
 
@@ -104,6 +107,8 @@ jobs:
       - name: Upsert env, activate compose, and restart
         uses: appleboy/ssh-action@v1.0.3
         env:
+          GHCR_ACTOR: ${{ github.actor }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           POSTGRES_PASSWORD: ${{ secrets.EMPLOYED_UAT_DB_PASSWORD }}
           SECRET_KEY: ${{ secrets.EMPLOYED_UAT_SECRET_KEY }}
           IP_SALT: ${{ secrets.EMPLOYED_UAT_IP_SALT }}
@@ -120,7 +125,7 @@ jobs:
           host: ${{ secrets.BOX3_HOST }}
           username: ubuntu
           key: ${{ secrets.BOX3_SSH_KEY }}
-          envs: POSTGRES_PASSWORD,SECRET_KEY,IP_SALT,STRIPE_SK,STRIPE_WH,STRIPE_PK,RECAPTCHA_SK,RECAPTCHA_SITE,GOOGLE_CLIENT_ID,GOOGLE_CLIENT_SECRET,RESEND_API_KEY,SENTRY_DSN
+          envs: GHCR_ACTOR,GHCR_TOKEN,POSTGRES_PASSWORD,SECRET_KEY,IP_SALT,STRIPE_SK,STRIPE_WH,STRIPE_PK,RECAPTCHA_SK,RECAPTCHA_SITE,GOOGLE_CLIENT_ID,GOOGLE_CLIENT_SECRET,RESEND_API_KEY,SENTRY_DSN
           script: |
             set -e
 
@@ -175,6 +180,11 @@ jobs:
             upsert CORS_ORIGINS         "https://employed.xibodev.com,https://mx.employed.xibodev.com,https://mz.employed.xibodev.com"
             upsert SENTRY_DSN           "$SENTRY_DSN"
             upsert SENTRY_ENVIRONMENT   uat
+
+            # Authenticate to GHCR — the employed images are now private org
+            # packages under ghcr.io/xibodev. The workflow GITHUB_TOKEN can read
+            # packages linked to this repo. Box 3 logs in before pulling.
+            echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_ACTOR" --password-stdin
 
             # Pull updated images and restart services
             docker compose pull
