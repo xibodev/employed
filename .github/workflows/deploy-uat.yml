@@ -125,6 +125,10 @@ jobs:
           host: ${{ secrets.BOX3_HOST }}
           username: ubuntu
           key: ${{ secrets.BOX3_SSH_KEY }}
+          # First pull of the freshly-namespaced org images has no shared layer
+          # cache on Box 3, so raise the default 10m command timeout to give the
+          # pull headroom (login + pull + migrate + smoke run in this one step).
+          command_timeout: 20m
           envs: GHCR_ACTOR,GHCR_TOKEN,POSTGRES_PASSWORD,SECRET_KEY,IP_SALT,STRIPE_SK,STRIPE_WH,STRIPE_PK,RECAPTCHA_SK,RECAPTCHA_SITE,GOOGLE_CLIENT_ID,GOOGLE_CLIENT_SECRET,RESEND_API_KEY,SENTRY_DSN
           script: |
             set -e
