@@ -2,8 +2,12 @@ name: ci
 
 on:
   push:
-    branches: [main, master, uat]
+    branches: [main, master]
   pull_request:
+  # Called as a gating job by deploy-uat.yml so a red CI blocks the UAT deploy.
+  # (uat pushes run CI through that reusable call, not the push trigger above,
+  # which avoids a duplicate run on every uat push.)
+  workflow_call:
 
 jobs:
   backend-lint:

@@ -24,8 +24,20 @@ on:
     branches: [uat]
     paths-ignore: ["**.md", "docs/**"]
 
+# Two pushes in quick succession would otherwise race each other on Box 3.
+concurrency:
+  group: deploy-uat
+  cancel-in-progress: false
+
 jobs:
+  # Gate: run the full CI suite first. A red CI fails this job and, through the
+  # `needs:` chain below, blocks the image build and the deploy.
+  ci:
+    uses: ./.github/workflows/ci.yml
+    secrets: inherit
+
   build-backend:
+    needs: ci
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -45,9 +57,14 @@ jobs:
         with:
           context: ./backend
           push: true
-          tags: ghcr.io/xibodev/employed-api:uat
+          # Push an immutable SHA tag alongside the floating `:uat` tag so the
+          # deployed image maps 1:1 to a git commit (rollback + prod promotion).
+          tags: |
+            ghcr.io/xibodev/employed-api:uat
+            ghcr.io/xibodev/employed-api:uat-${{ github.sha }}
 
   build-frontend:
+    needs: ci
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -68,7 +85,9 @@ jobs:
           context: ./frontend
           file: ./frontend/Dockerfile
           push: true
-          tags: ghcr.io/xibodev/employed-frontend:uat
+          tags: |
+            ghcr.io/xibodev/employed-frontend:uat
+            ghcr.io/xibodev/employed-frontend:uat-${{ github.sha }}
           build-args: |
             NEXT_PUBLIC_API_URL=https://api.employed.xibodev.com
             NEXT_PUBLIC_RECAPTCHA_SITE_KEY=${{ secrets.EMPLOYED_UAT_RECAPTCHA_SITE_KEY }}
@@ -109,6 +128,7 @@ jobs:
         env:
           GHCR_ACTOR: ${{ github.actor }}
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          IMAGE_TAG: uat-${{ github.sha }}
           POSTGRES_PASSWORD: ${{ secrets.EMPLOYED_UAT_DB_PASSWORD }}
           SECRET_KEY: ${{ secrets.EMPLOYED_UAT_SECRET_KEY }}
           IP_SALT: ${{ secrets.EMPLOYED_UAT_IP_SALT }}
@@ -129,7 +149,7 @@ jobs:
           # cache on Box 3, so raise the default 10m command timeout to give the
           # pull headroom (login + pull + migrate + smoke run in this one step).
           command_timeout: 20m
-          envs: GHCR_ACTOR,GHCR_TOKEN,POSTGRES_PASSWORD,SECRET_KEY,IP_SALT,STRIPE_SK,STRIPE_WH,STRIPE_PK,RECAPTCHA_SK,RECAPTCHA_SITE,GOOGLE_CLIENT_ID,GOOGLE_CLIENT_SECRET,RESEND_API_KEY,SENTRY_DSN
+          envs: GHCR_ACTOR,GHCR_TOKEN,IMAGE_TAG,POSTGRES_PASSWORD,SECRET_KEY,IP_SALT,STRIPE_SK,STRIPE_WH,STRIPE_PK,RECAPTCHA_SK,RECAPTCHA_SITE,GOOGLE_CLIENT_ID,GOOGLE_CLIENT_SECRET,RESEND_API_KEY,SENTRY_DSN
           script: |
             set -e
 
@@ -185,13 +205,22 @@ jobs:
             upsert SENTRY_DSN           "$SENTRY_DSN"
             upsert SENTRY_ENVIRONMENT   uat
 
-            # Authenticate to GHCR — the employed images are now private org
+            # Pin the deployed image to this commit's SHA tag. compose reads
+            # ${IMAGE_TAG} (defaulting to :uat) for every app service, so the
+            # running containers map 1:1 to a git SHA and rollback is a one-liner.
+            upsert IMAGE_TAG            "$IMAGE_TAG"
+
+            # Authenticate to GHCR — the employed images are private org
             # packages under ghcr.io/xibodev. The workflow GITHUB_TOKEN can read
             # packages linked to this repo. Box 3 logs in before pulling.
             echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_ACTOR" --password-stdin
 
-            # Pull updated images and restart services
+            # Pull updated images and run migrations as an explicit, fail-fast
+            # step BEFORE starting services, so an `alembic upgrade head` error
+            # surfaces as a deploy failure (not a silently crash-looping backend).
             docker compose pull
+            docker compose run --rm migrate
+
             docker compose up -d --remove-orphans
 
             # Wait for backend to become healthy (up to 60s)
@@ -204,4 +233,27 @@ jobs:
               echo "Waiting for backend ($i/10)..."
               sleep 6
             done
-            echo "Deploy and smoke test passed."
+
+            # Smoke beyond /health: frontend root + both market hosts via the
+            # public edge. Any non-2xx fails the deploy. Host header drives the
+            # market context, so we hit the edge with -H Host on localhost:3300.
+            echo "Smoke: frontend root (both market hosts)..."
+            for host in employed.xibodev.com mx.employed.xibodev.com mz.employed.xibodev.com; do
+              code=$(curl -fsS -o /dev/null -w '%{http_code}' -H "Host: ${host}" http://localhost:3300/ || echo 000)
+              if [ "$code" != "200" ]; then
+                echo "Frontend smoke failed for ${host}: HTTP ${code}"
+                exit 1
+              fi
+              echo "  ${host} -> ${code}"
+            done
+
+            # Smoke one read-only API journey through the backend.
+            echo "Smoke: read-only API journey (GET /jobs?page_size=1)..."
+            api_code=$(curl -fsS -o /dev/null -w '%{http_code}' "http://localhost:3301/jobs?page_size=1" || echo 000)
+            if [ "$api_code" != "200" ]; then
+              echo "API smoke failed: GET /jobs?page_size=1 -> HTTP ${api_code}"
+              exit 1
+            fi
+            echo "  GET /jobs?page_size=1 -> ${api_code}"
+
+            echo "Deploy and smoke tests passed (image ${IMAGE_TAG})."

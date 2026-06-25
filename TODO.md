@@ -72,15 +72,17 @@ The trust-centric hiring platform transformation has been **fully implemented**:
 
 ## 🟢 Engineering — UAT CI/CD hardening (toward a prod-ready pipeline)
 
-- [ ] Gate deploy on CI — `deploy-uat.yml` currently races `ci.yml` and a red CI
-      does not block the deploy.
-- [ ] Pin images by commit SHA (`:uat-<sha>` alongside `:uat`) + a one-command
-      rollback script.
-- [ ] Surface `alembic upgrade head` (migrate service) failures as deploy failures.
-- [ ] Add a `concurrency:` group on the deploy job (two pushes race on Box 3).
+- [x] Gate deploy on CI — `deploy-uat.yml` calls `ci.yml` (now `workflow_call`)
+      as a `needs:` gate, so a red CI blocks the build and deploy jobs.
+- [x] Pin images by commit SHA — build pushes `:uat-<sha>` alongside `:uat`,
+      compose reads `${IMAGE_TAG:-uat}`, deploy writes `IMAGE_TAG` to `.env`, and
+      `scripts/rollback-uat.sh` flips Box 3 back to a prior SHA in one command.
+- [x] Surface `alembic upgrade head` failures — explicit
+      `docker compose run --rm migrate` step fails the deploy before services start.
+- [x] Add a `concurrency:` group on the deploy job (two pushes race on Box 3).
 - [ ] GitHub Environments + required reviewers (foundation for a prod workflow).
-- [ ] Smoke beyond `/health`: frontend `/`, both market hosts, one read-only API
-      journey; fail the deploy on any non-2xx.
+- [x] Smoke beyond `/health`: frontend `/` on both market hosts + one read-only
+      API journey (`GET /jobs?page_size=1`); deploy fails on any non-2xx.
 - [ ] Trivy image scan (fail on HIGH/CRITICAL) + deploy notifications.
 - [ ] Rename default branch `master` → `main` (CI already covers both).
 - [ ] Atlas registration: add `atlas.json`, a CI `/register` step, and the
