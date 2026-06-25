@@ -64,8 +64,8 @@ multi-user + smoke), locale-aware assertions via `tests/e2e/i18n.js`
 |-------|------|
 | `postgres:16-alpine` | primary datastore (volume `postgres_data`) |
 | `redis:7-alpine` | queue/limits/revocation/replay (no persistence: `--save "" --appendonly no`) |
-| `ghcr.io/mekjr1/employed-api:uat` | backend + worker + migrate (one image, three services) |
-| `ghcr.io/mekjr1/employed-frontend:uat` | frontend |
+| `ghcr.io/xibodev/employed-api:uat` | backend + worker + migrate (one image, three services) |
+| `ghcr.io/xibodev/employed-frontend:uat` | frontend |
 | `python:3.12-slim` / `node:20-alpine` | build bases |
 | MailHog (test overlay only) | SMTP capture at 3310/3311 |
 

@@ -132,11 +132,11 @@ git push origin uat
 ```
 
 Pipeline stages (parallel builds, then sequential deploy):
-1. **build-backend** — pushes `ghcr.io/mekjr1/employed-api:uat`
-2. **build-frontend** — pushes `ghcr.io/mekjr1/employed-frontend:uat`
+1. **build-backend** — pushes `ghcr.io/xibodev/employed-api:uat`
+2. **build-frontend** — pushes `ghcr.io/xibodev/employed-frontend:uat`
 3. **deploy** — SCPs compose file, upserts `.env`, `docker compose pull && up -d`, smoke tests `/health`
 
-Monitor at: `gh run list --repo mekjr1/employed.co.mz`
+Monitor at: `gh run list --repo xibodev/employed`
 
 ### Rollback
 
@@ -150,7 +150,7 @@ cd /opt/employed
 docker compose pull
 
 # Or: temporarily pin the image digest in docker-compose.yml
-# image: ghcr.io/mekjr1/employed-api@sha256:<previous-digest>
+# image: ghcr.io/xibodev/employed-api@sha256:<previous-digest>
 docker compose up -d
 ```
 

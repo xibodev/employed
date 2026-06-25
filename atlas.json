@@ -4,10 +4,10 @@
   "box": "box3",
   "lifecycle": "live",
   "deploy_method": "ghcr_pull",
-  "repos": ["mekjr1/employed"],
+  "repos": ["xibodev/employed"],
   "ghcr_images": ["employed-api", "employed-frontend"],
   "public_hosts": ["employed.xibodev.com", "api.employed.xibodev.com"],
   "health_url": "https://api.employed.xibodev.com/health",
   "shared_deps": ["shared-postgres", "shared-redis"],
-  "notes": "Jobs marketplace (Mozambique). Self-hosted Next.js frontend + FastAPI backend containers on Box 3 via Caddy (no Vercel). Market hosts mx./mz.employed.xibodev.com reverse-proxy to the same frontend. Repo folder slug is employed.co.mz; live/observability slug is employed."
+  "notes": "Jobs marketplace (Mozambique). Self-hosted Next.js frontend + FastAPI backend containers on Box 3 via Caddy (no Vercel). Market hosts mx./mz.employed.xibodev.com reverse-proxy to the same frontend. Repo is xibodev/employed; live/observability slug is employed."
 }
