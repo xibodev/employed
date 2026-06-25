@@ -131,45 +131,42 @@ run before merge.
 
 Concrete gaps (in priority order):
 
-1. **Gate deploy on CI.** Today `deploy-uat.yml` triggers on every push to
-   `uat`, racing `ci.yml`. Switch to `workflow_run` of `ci`
-   (`types: [completed]` + `if: github.event.workflow_run.conclusion == 'success'`)
-   OR add a `needs:` chain in a single workflow. A red CI must block the
-   deploy job.
-2. **Pin images by commit SHA.** Replace mutable `ghcr.io/xibodev/employed-api:uat`
-   tags with `:uat-${{ github.sha }}` (push *both* `:uat` and the SHA tag so
-   the floating tag still works for humans). The deploy step then sets
-   `IMAGE_TAG` in `.env` and `docker compose pull` + `up -d` uses the SHA.
-   This is the foundation for rollback and for promoting an exact UAT image
-   into prod.
-3. **Surface migration failures in the deploy.** Migrations DO run — the
-   compose `migrate` service executes `alembic upgrade head` before
-   backend/worker start — but the workflow doesn't surface a migration
-   failure as a deploy failure. Add an explicit
-   `docker compose run --rm migrate` step (or check the service exit code)
-   after `pull` and before `up -d`, and fail the deploy if it errors.
-4. **One-command rollback.** Add `scripts/rollback-uat.sh` that takes a prior
-   SHA, edits `/opt/employed/.env`'s `IMAGE_TAG`, pulls, and restarts. Once
-   step 2 ships, this becomes trivial.
-5. **`concurrency:` group on deploy.** Two pushes in quick succession
-   currently race each other on Box 3. Add
-   `concurrency: { group: deploy-uat, cancel-in-progress: false }`.
+1. **Gate deploy on CI — DONE in repo, pending deploy.** `ci.yml` is now a
+   reusable workflow (`workflow_call`) and `deploy-uat.yml` calls it as a `ci`
+   job that the `build-*` and `deploy` jobs `needs:`. A red CI fails the gate
+   job and blocks the deploy. `ci.yml` no longer push-triggers on `uat` (the
+   reusable call covers it), avoiding a duplicate run.
+2. **Pin images by commit SHA — DONE in repo, pending deploy.** The build jobs
+   push *both* `:uat` and `:uat-${{ github.sha }}`; `deploy/docker-compose.prod.yml`
+   reads `${IMAGE_TAG:-uat}` for every app service; the deploy step writes
+   `IMAGE_TAG=uat-<sha>` into `/opt/employed/.env` so `docker compose pull` + the
+   running containers map 1:1 to a git SHA.
+3. **Surface migration failures in the deploy — DONE in repo, pending deploy.**
+   The deploy runs an explicit `docker compose run --rm migrate` after `pull`
+   and before `up -d`; a failing `alembic upgrade head` fails the deploy.
+4. **One-command rollback — DONE in repo, pending deploy.** `scripts/rollback-uat.sh`
+   takes a prior SHA (bare or `uat-` prefixed), verifies the image exists,
+   repoints `IMAGE_TAG` in `/opt/employed/.env`, pulls, migrates, restarts, and
+   health-gates the result.
+5. **`concurrency:` group on deploy — DONE in repo, pending deploy.**
+   `deploy-uat.yml` sets `concurrency: { group: deploy-uat, cancel-in-progress: false }`.
 6. **GitHub Environments + required reviewers.** Move UAT secrets behind an
    `environment: uat` block, then create an `environment: prod` with required
-   reviewers — this is the protection prod will need on day one.
-7. **Smoke beyond `/health`.** Today only backend `/health` is polled.
-   Extend to: frontend `/`, both market hosts (`mx.employed.xibodev.com`,
-   `mz.employed.xibodev.com`), and at least one read-only API journey
-   (e.g. `GET /jobs?limit=1`). Fail the deploy on any non-2xx.
+   reviewers — this is the protection prod will need on day one. *(Outstanding —
+   requires operator action in the GitHub repo settings UI.)*
+7. **Smoke beyond `/health` — DONE in repo, pending deploy.** The deploy smokes
+   the frontend `/` against both market hosts (`mx.*`, `mz.*` via the `Host`
+   header on `:3300`) and one read-only API journey (`GET /jobs?page_size=1`);
+   any non-2xx fails the deploy.
 8. **Worker healthcheck override — DONE in repo, pending deploy.** A
    Redis-ping healthcheck for the worker is committed in
    `deploy/docker-compose.prod.yml`; the live box keeps showing the
    false-negative "unhealthy" until the next deploy ships it.
 9. **Image vulnerability scan.** Add a Trivy scan step on the built image
    *before* push; fail on HIGH/CRITICAL. Acceptable allow-list lives in
-   `.trivyignore`.
+   `.trivyignore`. *(Outstanding.)*
 10. **Deploy notifications.** Post success/failure + commit SHA + actor to a
-    Slack/Discord webhook via a `DEPLOY_WEBHOOK_URL` repo secret.
+    Slack/Discord webhook via a `DEPLOY_WEBHOOK_URL` repo secret. *(Outstanding.)*
 
 Acceptance for "ready to clone into `deploy-prod.yml`":
 - A failing `ci.yml` blocks any UAT deploy.

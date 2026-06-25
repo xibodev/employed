@@ -1,0 +1,4 @@
+# Shell scripts must keep LF endings so they run on Linux (Box 3) regardless of
+# the platform they were edited on. CRLF in a #!/usr/bin/env bash script breaks
+# the shebang and `case ... in` parsing.
+*.sh text eol=lf
