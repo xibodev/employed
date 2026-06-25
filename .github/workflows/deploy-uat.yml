@@ -45,7 +45,7 @@ jobs:
         with:
           context: ./backend
           push: true
-          tags: ghcr.io/mekjr1/employed-api:uat
+          tags: ghcr.io/xibodev/employed-api:uat
 
   build-frontend:
     runs-on: ubuntu-latest
@@ -68,7 +68,7 @@ jobs:
           context: ./frontend
           file: ./frontend/Dockerfile
           push: true
-          tags: ghcr.io/mekjr1/employed-frontend:uat
+          tags: ghcr.io/xibodev/employed-frontend:uat
           build-args: |
             NEXT_PUBLIC_API_URL=https://api.employed.xibodev.com
             NEXT_PUBLIC_RECAPTCHA_SITE_KEY=${{ secrets.EMPLOYED_UAT_RECAPTCHA_SITE_KEY }}
