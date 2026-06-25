@@ -134,9 +134,7 @@ def ensure_live_profile(
 def _next_version_number(db: Session, profile_id: UUID | str) -> int:
     """Return the next monotonic version number for *profile_id* (max + 1)."""
     current_max = (
-        db.query(sa.func.max(ProfileVersion.version_number))
-        .filter(ProfileVersion.profile_id == profile_id)
-        .scalar()
+        db.query(sa.func.max(ProfileVersion.version_number)).filter(ProfileVersion.profile_id == profile_id).scalar()
     )
     return int(current_max or 0) + 1
 

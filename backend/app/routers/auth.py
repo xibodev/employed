@@ -483,11 +483,7 @@ def _apply_verified_domain_memberships(db: Any, user: Any) -> None:
         Company = resolve_model("Company")
         from app.services.memberships import apply_domain_auto_membership
 
-        companies = (
-            db.query(Company)
-            .filter(Company.verified_email_domains.contains([domain]))
-            .all()
-        )
+        companies = db.query(Company).filter(Company.verified_email_domains.contains([domain])).all()
         if not companies:
             return
         for company in companies:

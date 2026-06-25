@@ -40,9 +40,7 @@ class IllegalTransitionError(Exception):
     def __init__(self, current: VerificationState, target: VerificationState) -> None:
         self.current = current
         self.target = target
-        super().__init__(
-            f"Illegal verification transition: {current.value} -> {target.value}"
-        )
+        super().__init__(f"Illegal verification transition: {current.value} -> {target.value}")
 
 
 # Verification state machine (DD-4, mirrors the design diagram). Each key maps to

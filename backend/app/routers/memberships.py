@@ -49,12 +49,7 @@ def list_members_endpoint(
     resolved from the ``company_id`` path parameter.
     """
     _load_company(db, company_id)
-    memberships = (
-        db.query(Membership)
-        .filter(Membership.company_id == company_id)
-        .order_by(Membership.created_at)
-        .all()
-    )
+    memberships = db.query(Membership).filter(Membership.company_id == company_id).order_by(Membership.created_at).all()
     return [MembershipRead.model_validate(m) for m in memberships]
 
 

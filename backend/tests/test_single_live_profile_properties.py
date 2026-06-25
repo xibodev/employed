@@ -71,9 +71,7 @@ class _ProfileVersion(_Base):
     """SQLite-friendly stand-in for ``app.models.profile_version.ProfileVersion``."""
 
     __tablename__ = "profile_versions"
-    __table_args__ = (
-        sa.UniqueConstraint("profile_id", "version_number", name="uq_profile_versions_profile_version"),
-    )
+    __table_args__ = (sa.UniqueConstraint("profile_id", "version_number", name="uq_profile_versions_profile_version"),)
 
     id: Mapped[str] = mapped_column(sa.String(36), primary_key=True, default=lambda: str(uuid4()))
     profile_id: Mapped[str] = mapped_column(sa.String(36), nullable=False, index=True)

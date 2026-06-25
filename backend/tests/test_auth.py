@@ -217,9 +217,7 @@ def test_email_link_base_falls_back_to_app_base_url(client, monkeypatch):
     captured: dict[str, str] = {}
     monkeypatch.setattr(app_settings, "frontend_base_url", None)
     monkeypatch.setattr(app_settings, "app_base_url", "https://app.employed.example/")
-    monkeypatch.setattr(
-        "app.routers.auth.send_verification_email", lambda email, url: captured.__setitem__("url", url)
-    )
+    monkeypatch.setattr("app.routers.auth.send_verification_email", lambda email, url: captured.__setitem__("url", url))
 
     response = client.post(
         "/auth/register",

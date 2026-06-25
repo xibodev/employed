@@ -56,10 +56,7 @@ def _load_migration() -> Any:
     """
 
     migration_path = (
-        Path(__file__).resolve().parents[1]
-        / "alembic"
-        / "versions"
-        / "005_migrate_legacy_profiles_and_jobs.py"
+        Path(__file__).resolve().parents[1] / "alembic" / "versions" / "005_migrate_legacy_profiles_and_jobs.py"
     )
     spec = importlib.util.spec_from_file_location("migration_005_legacy", migration_path)
     assert spec is not None and spec.loader is not None
@@ -102,9 +99,7 @@ def apply_legacy_upgrade(
     ``(companies, memberships, audit_rows)`` in insertion order.
     """
 
-    taken_slugs: dict[str, set[str]] = {
-        market: set(slugs) for market, slugs in existing_slugs_by_market.items()
-    }
+    taken_slugs: dict[str, set[str]] = {market: set(slugs) for market, slugs in existing_slugs_by_market.items()}
 
     companies: list[dict[str, Any]] = []
     memberships: list[dict[str, Any]] = []
@@ -190,9 +185,7 @@ _reason = st.one_of(st.none(), st.text(max_size=12))
 _at = st.one_of(
     st.none(),
     st.datetimes(min_value=datetime(2000, 1, 1), max_value=datetime(2031, 1, 1)).map(lambda d: d.isoformat()),
-    st.datetimes(min_value=datetime(2000, 1, 1), max_value=datetime(2031, 1, 1)).map(
-        lambda d: d.isoformat() + "Z"
-    ),
+    st.datetimes(min_value=datetime(2000, 1, 1), max_value=datetime(2031, 1, 1)).map(lambda d: d.isoformat() + "Z"),
     st.text(max_size=6),
 )
 
@@ -223,7 +216,9 @@ def _dataset(draw: st.DrawFn) -> dict[str, Any]:
     _entry = st.one_of(_status_entry(), st.integers(), st.none())
     # ``status_history`` itself is usually a list, sometimes ``None`` / a dict to
     # exercise the outer ``isinstance(history, list)`` guard.
-    _history = st.one_of(st.none(), st.lists(_entry, max_size=5), st.dictionaries(st.text(max_size=3), st.integers(), max_size=2))
+    _history = st.one_of(
+        st.none(), st.lists(_entry, max_size=5), st.dictionaries(st.text(max_size=3), st.integers(), max_size=2)
+    )
 
     profiles = draw(
         st.lists(
@@ -377,7 +372,9 @@ def test_company_slugs_are_unique_per_market(names: list[str]) -> None:
     Validates: Requirements 23.1
     """
 
-    profiles = [{"id": uuid4(), "user_id": uuid4(), "name": name, "type": LEGACY_COMPANY_PROFILE_TYPE} for name in names]
+    profiles = [
+        {"id": uuid4(), "user_id": uuid4(), "name": name, "type": LEGACY_COMPANY_PROFILE_TYPE} for name in names
+    ]
     companies, _memberships, _audit = apply_legacy_upgrade(profiles, [], set(), existing_slugs_by_market={})
 
     slugs = [company["slug"] for company in companies]
@@ -510,9 +507,7 @@ def test_legacy_migration_over_real_postgres(data: dict[str, Any]) -> None:
                 )
 
             stored_company_count = conn.execute(sa.select(sa.func.count()).select_from(companies_t)).scalar_one()
-            stored_membership_count = conn.execute(
-                sa.select(sa.func.count()).select_from(memberships_t)
-            ).scalar_one()
+            stored_membership_count = conn.execute(sa.select(sa.func.count()).select_from(memberships_t)).scalar_one()
             owner_membership_count = conn.execute(
                 sa.select(sa.func.count())
                 .select_from(memberships_t)
@@ -523,9 +518,7 @@ def test_legacy_migration_over_real_postgres(data: dict[str, Any]) -> None:
             # Per-job ordering survives the JSONB round-trip: rows read back in
             # insertion order carry the source ``to`` statuses in order.
             stored_after_status: dict[Any, list[Any]] = {}
-            for row in conn.execute(
-                sa.select(audit_t.c.target_id, audit_t.c.after).order_by(audit_t.c.seq)
-            ):
+            for row in conn.execute(sa.select(audit_t.c.target_id, audit_t.c.after).order_by(audit_t.c.seq)):
                 stored_after_status.setdefault(row.target_id, []).append((row.after or {}).get("status"))
     finally:
         engine.dispose()

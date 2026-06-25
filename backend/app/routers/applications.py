@@ -51,10 +51,7 @@ def list_applications_endpoint(
     """
     _load_company(db, company_id)
     applications = (
-        db.query(Application)
-        .filter(Application.company_id == company_id)
-        .order_by(Application.created_at)
-        .all()
+        db.query(Application).filter(Application.company_id == company_id).order_by(Application.created_at).all()
     )
     return [ApplicationRead.model_validate(a) for a in applications]
 

@@ -34,7 +34,10 @@ jobs:
           Path('backend/requirements-ci.txt').write_text('\n'.join(requirements) + '\n', encoding='utf-8')
           PY
           python -m pip install --upgrade pip
-          pip install -r backend/requirements-ci.txt ruff
+          # Pin ruff so `ruff format --check` stays deterministic — an unpinned
+          # ruff can change formatting between releases and turn CI red with no
+          # code change.
+          pip install -r backend/requirements-ci.txt 'ruff==0.15.19'
 
       - name: Ruff check
         run: ruff check backend

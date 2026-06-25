@@ -23,9 +23,7 @@ def test_export_route_paths_carry_v1_version_segment():
     distinct namespace (R21.3)."""
     from app.main import app
 
-    export_paths = [
-        route.path for route in app.routes if hasattr(route, "path") and route.path.startswith("/export/")
-    ]
+    export_paths = [route.path for route in app.routes if hasattr(route, "path") and route.path.startswith("/export/")]
 
     assert export_paths, "expected at least one export route to be mounted"
     for path in export_paths:

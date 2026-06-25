@@ -134,9 +134,7 @@ def test_x_forwarded_host_takes_precedence(case: tuple[str, str], api_base: str,
     assert market_from_host(_request_market_host(req)) == MARKETS[expected_key]
 
     # Only the first entry of a comma-separated chain is honoured.
-    chained = _Request(
-        {"Host": api_host, "X-Forwarded-Host": f"{market_host}, proxy.internal{port}"}
-    )
+    chained = _Request({"Host": api_host, "X-Forwarded-Host": f"{market_host}, proxy.internal{port}"})
     assert market_from_host(_request_market_host(chained)) == MARKETS[expected_key]
 
 

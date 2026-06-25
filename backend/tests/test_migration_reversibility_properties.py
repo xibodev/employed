@@ -72,9 +72,7 @@ LEGACY_ADMIN = _admin_migration.LEGACY_ADMIN
 PLATFORM_SUPER_ADMIN = _admin_migration.PLATFORM_SUPER_ADMIN
 
 # --- 005: legacy profile/job conversion -------------------------------------
-_legacy_migration = _load_migration(
-    "005_migrate_legacy_profiles_and_jobs.py", "migration_005_reversibility"
-)
+_legacy_migration = _load_migration("005_migrate_legacy_profiles_and_jobs.py", "migration_005_reversibility")
 _slugify = _legacy_migration._slugify
 _unique_slug = _legacy_migration._unique_slug
 _parse_timestamp = _legacy_migration._parse_timestamp
@@ -128,9 +126,7 @@ def model_legacy_upgrade(
     ``(companies, memberships, audit_rows)`` in insertion order.
     """
 
-    taken_slugs: dict[str, set[str]] = {
-        market: set(slugs) for market, slugs in existing_slugs_by_market.items()
-    }
+    taken_slugs: dict[str, set[str]] = {market: set(slugs) for market, slugs in existing_slugs_by_market.items()}
 
     companies: list[dict[str, Any]] = []
     memberships: list[dict[str, Any]] = []
@@ -243,9 +239,7 @@ _admin_role_pool = [LEGACY_ADMIN, PLATFORM_SUPER_ADMIN, "moderator", "support", 
 
 @st.composite
 def _admin_population(draw: st.DrawFn) -> dict[UUID, list[str]]:
-    role_lists = draw(
-        st.lists(st.lists(st.sampled_from(_admin_role_pool), max_size=5, unique=True), max_size=12)
-    )
+    role_lists = draw(st.lists(st.lists(st.sampled_from(_admin_role_pool), max_size=5, unique=True), max_size=12))
     return {uuid4(): roles for roles in role_lists}
 
 
@@ -417,9 +411,7 @@ def test_legacy_migration_upgrade_then_downgrade_restores_state(state: dict[str,
         assert row["after"][AUDIT_MARKER_KEY] == AUDIT_MARKER_VALUE
 
     # Apply downgrade(): marker-based deletion of exactly the created rows.
-    down_companies, down_memberships, down_audit = model_legacy_downgrade(
-        post_companies, post_memberships, post_audit
-    )
+    down_companies, down_memberships, down_audit = model_legacy_downgrade(post_companies, post_memberships, post_audit)
 
     # The row sets are restored: every migration-created (marked) row is removed,
     # and every pre-existing (unmarked) row remains, in its original order.
@@ -551,9 +543,7 @@ def test_legacy_downgrade_over_real_postgres(state: dict[str, Any]) -> None:
             # Replay downgrade(): the migration's exact marker predicates.
             conn.execute(
                 audit_t.delete().where(
-                    sa.text("after ->> :key = :value").bindparams(
-                        key=AUDIT_MARKER_KEY, value=AUDIT_MARKER_VALUE
-                    )
+                    sa.text("after ->> :key = :value").bindparams(key=AUDIT_MARKER_KEY, value=AUDIT_MARKER_VALUE)
                 )
             )
             conn.execute(

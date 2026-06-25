@@ -101,7 +101,11 @@ def to_json_resume(profile_or_version: Any) -> dict[str, Any]:
         basics["location"] = {"address": location}
 
     profiles: list[dict[str, str]] = []
-    for network, attr in (("GitHub", "github_url"), ("LinkedIn", "linkedin_url"), ("Stack Overflow", "stackoverflow_url")):
+    for network, attr in (
+        ("GitHub", "github_url"),
+        ("LinkedIn", "linkedin_url"),
+        ("Stack Overflow", "stackoverflow_url"),
+    ):
         link = getattr(profile_or_version, attr, None)
         if link:
             profiles.append({"network": network, "url": link})

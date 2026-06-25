@@ -246,7 +246,7 @@ def _document(resume: dict[str, Any], *, template: ResumeTemplate) -> str:
       ul {{ margin: 4px 0 0 18px; padding: 0; font-size: 12px; }}
     """
     return (
-        "<!DOCTYPE html><html><head><meta charset=\"utf-8\">"
+        '<!DOCTYPE html><html><head><meta charset="utf-8">'
         f"<title>{title}</title><style>{css}</style></head><body>"
         f"{_basics_block(basics)}{_body_sections(resume)}"
         "</body></html>"
@@ -258,7 +258,13 @@ def _document(resume: dict[str, Any], *, template: ResumeTemplate) -> str:
 # --------------------------------------------------------------------------- #
 
 _TEMPLATE_SPECS: tuple[tuple[str, str, str, str, str], ...] = (
-    ("classic", "Classic", "Serif, single-column, conservative layout.", "#1f2d3d", "Georgia, 'Times New Roman', serif"),
+    (
+        "classic",
+        "Classic",
+        "Serif, single-column, conservative layout.",
+        "#1f2d3d",
+        "Georgia, 'Times New Roman', serif",
+    ),
     ("modern", "Modern", "Sans-serif with a coloured accent.", "#2563eb", "'Helvetica Neue', Arial, sans-serif"),
     ("minimal", "Minimal", "Restrained monochrome layout.", "#111111", "Arial, sans-serif"),
 )
@@ -284,10 +290,7 @@ RESUME_TEMPLATES: dict[str, ResumeTemplate] = {spec[0]: _make_template(spec) for
 
 def list_resume_templates() -> list[dict[str, str]]:
     """Return public metadata for every predefined template (R14.1)."""
-    return [
-        {"id": t.id, "name": t.name, "description": t.description}
-        for t in RESUME_TEMPLATES.values()
-    ]
+    return [{"id": t.id, "name": t.name, "description": t.description} for t in RESUME_TEMPLATES.values()]
 
 
 def get_resume_template(template_id: str | None) -> ResumeTemplate:
@@ -407,8 +410,7 @@ def _fallback_text_pdf(doc: str, *, lines_per_page: int = 44) -> bytes:
         page_numbers.append(page_num)
         objects[page_num] = (
             b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] "
-            b"/Resources << /Font << /F1 3 0 R >> >> /Contents "
-            + f"{content_num} 0 R >>".encode("latin-1")
+            b"/Resources << /Font << /F1 3 0 R >> >> /Contents " + f"{content_num} 0 R >>".encode("latin-1")
         )
         stream = _content_stream(page_lines)
         objects[content_num] = (

@@ -34,9 +34,7 @@ def test_external_refs_is_jsonb_column(model: type) -> None:
     assert "external_refs" in columns, f"{model.__name__} is missing the external_refs column"
 
     column = columns["external_refs"]
-    assert isinstance(column.type, JSONB), (
-        f"{model.__name__}.external_refs should be JSONB, got {column.type!r}"
-    )
+    assert isinstance(column.type, JSONB), f"{model.__name__}.external_refs should be JSONB, got {column.type!r}"
     assert column.nullable is False, f"{model.__name__}.external_refs should be NOT NULL"
 
 
@@ -46,7 +44,5 @@ def test_id_is_uuid_primary_key(model: type) -> None:
     assert "id" in columns, f"{model.__name__} is missing the id column"
 
     column = columns["id"]
-    assert isinstance(column.type, PGUUID), (
-        f"{model.__name__}.id should be a UUID column, got {column.type!r}"
-    )
+    assert isinstance(column.type, PGUUID), f"{model.__name__}.id should be a UUID column, got {column.type!r}"
     assert column.primary_key is True, f"{model.__name__}.id should be the primary key"

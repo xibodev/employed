@@ -159,9 +159,7 @@ def test_company_derive_badges_equals_condition_set(state: dict[str, Any]) -> No
         max_size=7,
     ),
 )
-def test_reconcile_makes_company_badges_equal_derivation(
-    state: dict[str, Any], initial: list[str]
-) -> None:
+def test_reconcile_makes_company_badges_equal_derivation(state: dict[str, Any], initial: list[str]) -> None:
     """After reconciliation the Company's ``trust_badges`` equals ``derive_badges``.
 
     Starting from an arbitrary pre-existing badge list (which may include badges
@@ -193,9 +191,7 @@ def test_reconcile_makes_company_badges_equal_derivation(
 # Feature: multi-tenant-hiring-platform, Property 8: Trust badges equal the derived condition set
 @settings(max_examples=100, deadline=None)
 @given(state=_company_state, second=_company_state)
-def test_reconcile_tracks_conditions_changing_over_time(
-    state: dict[str, Any], second: dict[str, Any]
-) -> None:
+def test_reconcile_tracks_conditions_changing_over_time(state: dict[str, Any], second: dict[str, Any]) -> None:
     """Reconciliation tracks a Company whose conditions change between calls.
 
     A first reconciliation attaches the badges for the initial state; mutating the
