@@ -1,10 +1,43 @@
-<!-- last_verified: 2026-06-15T00:00:00Z | git_ref: fix/quality-run-2026-06-10 | verified_by: self-contained cleanse 2026-06-15 -->
+<!-- last_verified: 2026-06-19T00:00:00Z | git_ref: uat (multi-tenant-hiring-platform complete) | verified_by: full implementation doc refresh -->
 
 # Employed
 
-Employed is a multilingual hiring platform for Mozambique and Mexico, localized by subdomain and built on a FastAPI + Next.js stack.
+Employed is a trust-centric, integration-ready hiring platform for Mozambique and Mexico: *more than a job board, less than a heavy ATS*.
 
-It began as a job board — companies post roles, candidates browse active opportunities, and admins moderate listings before they go live — and is evolving into a trust-centric, integration-ready hiring platform: *more than a job board, less than a heavy ATS*. That evolution adds multi-tenant companies and memberships, a two-layer permission-based access model, per-entity verification with composable trust badges, version-controlled JSON Resume profiles, a lightweight applications pipeline, an append-only audit trail, outbound webhooks, and a versioned export API exposing standard schemas (JSON Resume, schema.org `JobPosting`). Market (geography/locale/payment) and tenant (organization) remain orthogonal axes.
+Built on FastAPI + Next.js, it combines the core job board functionality (companies post roles, candidates browse opportunities, admins moderate listings) with advanced hiring platform features: multi-tenant companies and memberships, a two-layer RBAC permission system, per-entity verification with composable trust badges, version-controlled JSON Resume profiles, a lightweight applications pipeline, an append-only audit trail, outbound webhooks, and a versioned export API exposing standard schemas. Market (geography/locale/payment) and tenant (organization) remain orthogonal axes.
+
+## Core Features
+
+### Trust & Verification System
+- **Per-entity verification state machine** with states: unverified → pending → verified/rejected/revoked/flagged
+- **Composable trust badges** (domain verified, business-document verified, email verified, etc.) — no single numeric score
+- **Low-friction domain verification** via DNS TXT records or matching member emails
+- **Manual business-document verification** for higher trust tiers
+
+### Multi-Tenant Organization Management
+- **Company entities** with unique slugs per market, verification status, and trust badges
+- **Membership system** linking users to companies with tenant-scoped roles (org_owner, org_admin, recruiter, member)
+- **Two-layer RBAC** with platform-level and tenant-level permissions
+- **Domain auto-membership** for verified company email domains
+
+### Applications Pipeline
+- **First-class Application entity** with tracked pipeline stages: applied → reviewed → shortlisted → rejected → hired
+- **Version-controlled candidate profiles** using JSON Resume standard with immutable snapshots
+- **Recruiter management interface** with list and kanban board views
+- **Email templates** with token substitution for application communications
+- **Dual application channels**: tracked pipeline (default) + email-apply (always available)
+
+### Integration & Export
+- **Versioned export API** returning candidates in JSON Resume format, jobs in schema.org JobPosting JSON-LD
+- **External references** JSONB field on all major entities for mapping to external ATS IDs
+- **Outbound webhooks** for key events (job.published, application.created, application.status_changed)
+- **Standard schemas** at all integration boundaries to prevent lock-in
+
+### Audit & Compliance
+- **Append-only audit trail** capturing all privileged, verification, and moderation actions
+- **Immutable profile versions** that can never be modified after creation
+- **Actor tracking** with support for both user actors and system actors
+- **Before/after state** capture for all changes
 
 ## Markets
 

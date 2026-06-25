@@ -200,8 +200,7 @@ def _default_dns_txt_resolver(domain: str) -> list[str]:
         import dns.resolver  # type: ignore[import-untyped]
     except ImportError as exc:  # pragma: no cover - exercised only without dnspython
         raise RuntimeError(
-            "DNS TXT domain verification requires the 'dnspython' package or an "
-            "injected resolver (pass resolver=...)."
+            "DNS TXT domain verification requires the 'dnspython' package or an injected resolver (pass resolver=...)."
         ) from exc
 
     answers = dns.resolver.resolve(domain, "TXT")

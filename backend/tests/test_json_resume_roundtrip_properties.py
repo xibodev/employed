@@ -90,9 +90,7 @@ _json_scalars = (
 )
 _json_values = st.recursive(
     _json_scalars,
-    lambda children: (
-        st.lists(children, max_size=4) | st.dictionaries(_safe_text, children, max_size=4)
-    ),
+    lambda children: st.lists(children, max_size=4) | st.dictionaries(_safe_text, children, max_size=4),
     max_leaves=12,
 )
 

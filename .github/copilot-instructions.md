@@ -2,8 +2,9 @@
 
 ## Project
 
-FastAPI + Next.js job board with market selection by subdomain (`mx.*`, `mz.*`).
-Frontend is in `frontend/`; backend is in `backend/`.
+**Trust-centric, integration-ready hiring platform** for Mozambique (MZ) and Mexico (MX) built on FastAPI + Next.js 15. **Multi-tenant hiring platform implementation complete** with company management, two-layer RBAC, verification & trust system, application pipeline, and integration APIs. Frontend is in `frontend/`; backend is in `backend/`.
+
+**🎉 ALL 92 TASKS COMPLETE**: Company entities + membership management, two-layer RBAC authorization, verification state machine + trust badges, JSON Resume profile versioning, Application pipeline with recruiter workflow, append-only audit trail, outbound webhooks, versioned export API, database migrations (003-005), and comprehensive frontend integration.
 
 ## Mandatory rules (self-contained)
 
@@ -25,9 +26,41 @@ Frontend is in `frontend/`; backend is in `backend/`.
 ## Key files
 
 - `CLAUDE.md` — current architecture notes
-- `backend/app/main.py` — FastAPI app entrypoint
+- `backend/app/main.py` — FastAPI app entrypoint (includes new hiring platform routers)
 - `backend/app/config.py` — backend settings
-- `backend/app/routers/` — API route modules
+- `backend/app/routers/` — API route modules (includes companies, memberships, applications, verification, export_api, webhooks_admin)
+- `backend/app/services/` — Business logic (rbac, verification, trust, companies, memberships, applications, webhooks, export)
+- `backend/app/models/` — SQLAlchemy models (includes company, membership, application, audit_log, profile_version, webhook)
+- `backend/alembic/versions/` — Database migrations (003_rbac_and_tenancy, 004_migrate_admins, 005_migrate_legacy_profiles_and_jobs)
+- `frontend/src/components/company/` — Company management UI components
+- `frontend/src/components/applications/` — Application pipeline UI (list + kanban views)
+- `frontend/src/contexts/TenantContext.tsx` — Tenant (company) context management
+- `docs/architecture/` — Comprehensive architecture documentation including RBAC_AND_TENANCY.md, VERIFICATION_AND_TRUST.md, INTEGRATION_AND_EXPORT.md
+
+## Multi-Tenant Hiring Platform Architecture
+
+**Authorization Model**
+- **Two layers**: Platform permissions (cross-tenant) + tenant permissions (company-scoped)
+- **Authorization primitive**: Atomic permissions (`job:post`, `company:verify`) not role names
+- **Tenant scope**: Resolved from target resource's `company_id`
+- **require_permission()** FastAPI dependency for all authorization checks
+
+**Core Entities**
+- **Company**: Multi-tenant organization with verification_status, trust_badges, verified_email_domains
+- **Membership**: User↔Company relationship with role (org_owner, org_admin, recruiter, member) and status
+- **Application**: First-class pipeline entity (applied → reviewed → shortlisted → rejected → hired)
+- **ProfileVersion**: Immutable JSON Resume snapshots of live profiles
+- **AuditLog**: Append-only trail for all privileged actions
+
+**Trust & Verification**
+- **State machine**: unverified → pending → verified/rejected/revoked/flagged (reusable across entities)
+- **Trust badges**: Composable named signals (domain verified, business-document verified, etc.)
+- **Domain verification**: DNS TXT records or matching member email addresses
+
+**Integration & Export** 
+- **Webhooks**: job.published, application.created, application.status_changed with retry logic
+- **Export API**: /api/export/v1/ returning JSON Resume (candidates), JobPosting JSON-LD (jobs)
+- **External refs**: JSONB fields on all major entities for ATS integration without migrations
 - `backend/app/services/` — business logic (RBAC, verification, trust, companies, memberships, applications, webhooks, export)
 - `backend/app/models/` — SQLAlchemy models
 - `frontend/src/lib/api.ts` — frontend API base URL handling

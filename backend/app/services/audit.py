@@ -69,9 +69,7 @@ def write_audit(
 
 def _block_mutation(_mapper, _connection, target: object) -> None:
     """``before_update`` listener that forbids mutating append-only rows."""
-    raise ImmutableRecordError(
-        f"{type(target).__name__} rows are append-only and cannot be modified"
-    )
+    raise ImmutableRecordError(f"{type(target).__name__} rows are append-only and cannot be modified")
 
 
 # Reinforce append-only immutability at the ORM layer (DD-9). The service has

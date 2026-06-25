@@ -45,9 +45,7 @@ def _load_migration() -> Any:
     real migration mapping helper and constants.
     """
 
-    migration_path = (
-        Path(__file__).resolve().parents[1] / "alembic" / "versions" / "004_migrate_admins.py"
-    )
+    migration_path = Path(__file__).resolve().parents[1] / "alembic" / "versions" / "004_migrate_admins.py"
     spec = importlib.util.spec_from_file_location("migration_004_migrate_admins", migration_path)
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
@@ -81,9 +79,7 @@ def apply_admin_upgrade(users: dict[UUID, list[str]]) -> dict[UUID, list[str]]:
 # "admin" sentinel, the target RBAC role, and unrelated values so generated
 # users land in every meaningful bucket: pure admins, admins with extra roles,
 # users that already carry the target role, and non-admins.
-_role = st.sampled_from(
-    [LEGACY_ADMIN, PLATFORM_SUPER_ADMIN, "moderator", "support", "employer", "candidate", "user"]
-)
+_role = st.sampled_from([LEGACY_ADMIN, PLATFORM_SUPER_ADMIN, "moderator", "support", "employer", "candidate", "user"])
 _role_list = st.lists(_role, max_size=6)
 
 

@@ -97,9 +97,7 @@ def accept_invitation(
     membership.
     """
     if membership.status is not MembershipStatus.invited:
-        raise MembershipError(
-            f"only an invited membership can be accepted (status={membership.status.value})"
-        )
+        raise MembershipError(f"only an invited membership can be accepted (status={membership.status.value})")
 
     try:
         with db.begin_nested():
@@ -172,11 +170,7 @@ def apply_domain_auto_membership(
     Flushes within the caller's transaction (DD-10). Returns the single
     ``Membership`` for the pair.
     """
-    stmt = (
-        sa.select(Membership)
-        .where(Membership.user_id == user.id, Membership.company_id == company.id)
-        .limit(1)
-    )
+    stmt = sa.select(Membership).where(Membership.user_id == user.id, Membership.company_id == company.id).limit(1)
     existing = db.execute(stmt).scalar_one_or_none()
 
     if existing is not None:

@@ -70,9 +70,7 @@ _statuses = st.sampled_from(list(ApplicationStatus))
 
 @settings(max_examples=100)
 @given(initial_status=_statuses, target_status=_statuses)
-def test_change_status_persists_new_stage(
-    initial_status: ApplicationStatus, target_status: ApplicationStatus
-) -> None:
+def test_change_status_persists_new_stage(initial_status: ApplicationStatus, target_status: ApplicationStatus) -> None:
     db = _FakeSession()
     actor = SimpleNamespace(id=uuid4())
 

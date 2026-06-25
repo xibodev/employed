@@ -67,9 +67,7 @@ class _Company(_Base):
     verification_status: Mapped[VerificationState] = mapped_column(
         sa.Enum(VerificationState, native_enum=False), nullable=False
     )
-    verified_email_domains: Mapped[list] = mapped_column(
-        MutableList.as_mutable(sa.JSON), nullable=False, default=list
-    )
+    verified_email_domains: Mapped[list] = mapped_column(MutableList.as_mutable(sa.JSON), nullable=False, default=list)
     trust_badges: Mapped[list] = mapped_column(MutableList.as_mutable(sa.JSON), nullable=False, default=list)
     external_refs: Mapped[dict] = mapped_column(MutableDict.as_mutable(sa.JSON), nullable=False, default=dict)
 

@@ -37,7 +37,7 @@ if "bleach" not in sys.modules:
 import app.models as app_models
 from app.auth.jwt import create_access_token
 from app.main import create_app
-from app.middleware.rate_limit import rate_limiter
+from app.middleware.rate_limit import close_quietly, rate_limiter, redis_client
 from app.routers.auth import failed_login_tracker
 from app.services.market import MARKETS
 from app.webhooks import mobile_money, stripe_webhook
@@ -218,6 +218,24 @@ TEST_MODELS = {
 }
 
 
+def _flush_test_redis() -> None:
+    """Flush the Redis DB used by the test environment, if one is configured.
+
+    Rate-limit, lockout, JTI-revocation and webhook-replay state live in Redis
+    whenever REDIS_URL is set (e.g. CI). Flushing between tests keeps each test
+    isolated. Best-effort: a missing or unreachable Redis is a no-op (the
+    in-process fallbacks are already cleared by the autouse fixture)."""
+    client = redis_client()
+    if client is None:
+        return
+    try:
+        client.flushdb()
+    except Exception:  # noqa: BLE001 — test isolation must never hard-fail on infra
+        pass
+    finally:
+        close_quietly(client)
+
+
 @pytest.fixture(autouse=True)
 def _patch_models(monkeypatch: pytest.MonkeyPatch) -> None:
     for name, model in TEST_MODELS.items():
@@ -227,8 +245,15 @@ def _patch_models(monkeypatch: pytest.MonkeyPatch) -> None:
         "app.webhooks.stripe_webhook.coerce_pk", lambda value: str(value) if value is not None else None
     )
     monkeypatch.setattr("app.webhooks.mobile_money.coerce_pk", lambda value: str(value) if value is not None else None)
+    # Reset the in-process rate-limit and lockout stores between tests.
     rate_limiter._buckets.clear()
     failed_login_tracker.clear()
+    # When REDIS_URL is set (CI), rate-limit counters, lockout state, JTI
+    # revocation and webhook replay keys live in Redis — not the in-process
+    # stores above. Without flushing them, fixed-window counters accumulate
+    # across tests and later requests get a spurious 429. Flush the test DB so
+    # each test starts clean. No-op locally where Redis is absent.
+    _flush_test_redis()
 
 
 @pytest.fixture()
