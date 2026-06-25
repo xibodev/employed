@@ -23,7 +23,7 @@
 | Box | **Box 3** — Contabo VPS (consumer + SaaS product backends). Host/IP via GitHub secret `BOX3_HOST`; SSH key via `BOX3_SSH_KEY` (operator's local key is `~/.ssh/contabo_box3`). |
 | Compose dir | `/opt/employed/` on the box |
 | Reverse proxy | Caddy on Box 3 (ACME TLS), managed outside this repo |
-| Images | `ghcr.io/mekjr1/employed-api:uat`, `ghcr.io/mekjr1/employed-frontend:uat` (floating `:uat` tag; SHA-pinning is an open hardening item). Org migration to `ghcr.io/xibodev/*` is planned. |
+| Images | `ghcr.io/xibodev/employed-api:uat`, `ghcr.io/xibodev/employed-frontend:uat` (floating `:uat` tag; SHA-pinning is an open hardening item). |
 
 ## Host-port allocation (Box 3 / local)
 

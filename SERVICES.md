@@ -16,7 +16,7 @@ Multilingual job board for Mozambique and Mexico. Companies post jobs, candidate
 ## Repos
 | Surface | Repo | Path in repo |
 |---------|------|--------------|
-| Product monorepo | [`mekjr1/employed.co.mz`](https://github.com/mekjr1/employed.co.mz) | repo root |
+| Product monorepo | [`xibodev/employed`](https://github.com/xibodev/employed) | repo root |
 | Backend API | same repo | `backend/` |
 | Frontend | same repo | `frontend/` |
 | Deployment | same repo | `deploy/` + `.github/workflows/` |
@@ -75,7 +75,7 @@ deploy. Full detail: `docs/product/RELEASE_NOTES.md`.
 | Host | Box 3 (Contabo VPS) — `ubuntu@$BOX3_HOST` (IP in local SSH config / GH secret `BOX3_HOST`, never in-repo) |
 | Compose dir | `/opt/employed/` |
 | Compose file | `deploy/docker-compose.prod.yml` copied to `/opt/employed/docker-compose.yml` |
-| Image | `ghcr.io/mekjr1/employed-api:uat` |
+| Image | `ghcr.io/xibodev/employed-api:uat` |
 | Port | `3301` host → `8000` container |
 | Reverse proxy | Caddy → `api.employed.xibodev.com { reverse_proxy localhost:3301 }` |
 | Health | `GET /health` → `{ "status": "ok", "db": "ok", "redis": "ok" }` |
@@ -84,7 +84,7 @@ deploy. Full detail: `docs/product/RELEASE_NOTES.md`.
 ### Frontend (Box 3)
 | | |
 |---|---|
-| Image | `ghcr.io/mekjr1/employed-frontend:uat` |
+| Image | `ghcr.io/xibodev/employed-frontend:uat` |
 | Port | `3300` host → `3000` container |
 | Reverse proxy | Caddy → `employed.xibodev.com`, `mx.employed.xibodev.com`, `mz.employed.xibodev.com` all proxy to `localhost:3300` |
 | Stack | Next.js 15, React 19, TypeScript 5.7.2, Tailwind CSS 4 |
@@ -165,7 +165,7 @@ Facebook, GitHub, and Twitter OAuth env slots exist in examples, but those provi
 |---|---|
 | Workflow | `.github/workflows/deploy-uat.yml` |
 | Trigger | push to `uat` branch, ignoring docs-only paths |
-| Build | Docker build/push to `ghcr.io/mekjr1/employed-api:uat` and `ghcr.io/mekjr1/employed-frontend:uat` |
+| Build | Docker build/push to `ghcr.io/xibodev/employed-api:uat` and `ghcr.io/xibodev/employed-frontend:uat` |
 | Deploy | SSH to Box 3 as `ubuntu`; ensure `/opt/employed/`; copy compose; upsert `.env`; `docker compose pull && docker compose up -d --remove-orphans` |
 | Smoke | `curl -fsSo /dev/null http://localhost:3301/health` |
 | GH secrets | `BOX3_HOST`, `BOX3_SSH_KEY`, `EMPLOYED_UAT_DB_PASSWORD`, `EMPLOYED_UAT_SECRET_KEY`, `EMPLOYED_UAT_IP_SALT`, Stripe, reCAPTCHA, Google, Resend secrets |

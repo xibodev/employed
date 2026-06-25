@@ -13,7 +13,7 @@ verified_by: self-contained cleanse 2026-06-15
 
 | Field | Value |
 |---|---|
-| Repo | `mekjr1/employed.co.mz` |
+| Repo | `xibodev/employed` |
 | Default branch | `master` (GitHub) — rename to `main` is an open TODO in `SERVICES.md` |
 | Deploy branch | `uat` (push to `uat` triggers the deploy workflow) |
 | Live UAT baseline | live build `uat` @ `00aa899`; `uat` branch ref now `e168f8b` (merged 2026-06-15). Deploy run `27585388941` **FAILED** at `docker compose pull` (GHCR `denied` on Box 3) — live build unchanged. See Drift & notes |
@@ -28,7 +28,7 @@ verified_by: self-contained cleanse 2026-06-15
 ## How deployed
 
 - **CI workflow**: `Deploy UAT` → `.github/workflows/deploy-uat.yml` (self-contained; uses `appleboy/ssh-action` + `scp-action` directly — no shared reusable workflow)
-- **Images**: `ghcr.io/mekjr1/employed-api:uat`, `ghcr.io/mekjr1/employed-frontend:uat` (floating tags; SHA pinning is an open hardening TODO)
+- **Images**: `ghcr.io/xibodev/employed-api:uat`, `ghcr.io/xibodev/employed-frontend:uat` (floating tags; SHA pinning is an open hardening TODO)
 - **Deploy chain**: build+push both images → SSH to Box 3 → copy compose → upsert `/opt/employed/.env` from GitHub secrets → `docker compose pull && docker compose up -d --remove-orphans` → smoke `curl http://localhost:3301/health` (10 × 6 s)
 - **Migrations**: the compose `migrate` service runs `alembic upgrade head` before backend/worker start; the workflow itself has no separate migration step
 - Deploy is **not** gated on `ci.yml`; pushes to `uat` deploy immediately (hardening TODOs in `.github/copilot-instructions.md`)
@@ -67,8 +67,8 @@ Image tags currently float on `:uat` (no per-SHA tags yet), so rollback is by im
 ```bash
 # On the box:
 cd /opt/employed
-# edit docker-compose.yml: replace 'image: ghcr.io/mekjr1/employed-api:uat'
-# with 'image: ghcr.io/mekjr1/employed-api@sha256:<previous-digest>'
+# edit docker-compose.yml: replace 'image: ghcr.io/xibodev/employed-api:uat'
+# with 'image: ghcr.io/xibodev/employed-api@sha256:<previous-digest>'
 docker compose up -d --force-recreate
 ```
 

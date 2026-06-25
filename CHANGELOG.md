@@ -832,5 +832,5 @@ multiple PRs and are summarised here so the on-call can find them quickly.
 - Aria labels on every interactive control, including the moderation
   queue and the Summernote toolbars.
 
-[Unreleased]: https://github.com/mekjr1/employed.co.mz/compare/v1.0.x...HEAD
-[1.0.x]: https://github.com/mekjr1/employed.co.mz/releases/tag/v1.0.x
+[Unreleased]: https://github.com/xibodev/employed/compare/v1.0.x...HEAD
+[1.0.x]: https://github.com/xibodev/employed/releases/tag/v1.0.x

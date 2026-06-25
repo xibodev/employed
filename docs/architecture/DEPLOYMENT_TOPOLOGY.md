@@ -70,8 +70,8 @@ production hosts) — not used on Box 3, where Caddy fills that role.
 
 | Image | Built from | Registry tag |
 |-------|-----------|--------------|
-| API/worker/migrate | `backend/Dockerfile` — 2-stage python:3.12-slim; venv with the three pinned runtime requirement sets only (EMP-021); uvicorn :8000 | `ghcr.io/mekjr1/employed-api:uat` |
-| frontend | `frontend/Dockerfile` — 3-stage node:20-alpine; `next build` standalone; `NEXT_PUBLIC_API_URL`/`NEXT_PUBLIC_RECAPTCHA_SITE_KEY` build args kept only as fallbacks — runtime env wins via `window.__ENV` (EMP-012) | `ghcr.io/mekjr1/employed-frontend:uat` |
+| API/worker/migrate | `backend/Dockerfile` — 2-stage python:3.12-slim; venv with the three pinned runtime requirement sets only (EMP-021); uvicorn :8000 | `ghcr.io/xibodev/employed-api:uat` |
+| frontend | `frontend/Dockerfile` — 3-stage node:20-alpine; `next build` standalone; `NEXT_PUBLIC_API_URL`/`NEXT_PUBLIC_RECAPTCHA_SITE_KEY` build args kept only as fallbacks — runtime env wins via `window.__ENV` (EMP-012) | `ghcr.io/xibodev/employed-frontend:uat` |
 
 No image pinning by SHA yet — both tags float on `:uat` (hardening TODO in
 `SERVICES.md`).

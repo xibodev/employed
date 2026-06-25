@@ -1,4 +1,4 @@
-# Copilot Instructions — employed.co.mz
+# Copilot Instructions — Employed
 
 ## Project
 
@@ -136,7 +136,7 @@ Concrete gaps (in priority order):
    (`types: [completed]` + `if: github.event.workflow_run.conclusion == 'success'`)
    OR add a `needs:` chain in a single workflow. A red CI must block the
    deploy job.
-2. **Pin images by commit SHA.** Replace mutable `ghcr.io/mekjr1/employed-api:uat`
+2. **Pin images by commit SHA.** Replace mutable `ghcr.io/xibodev/employed-api:uat`
    tags with `:uat-${{ github.sha }}` (push *both* `:uat` and the SHA tag so
    the floating tag still works for humans). The deploy step then sets
    `IMAGE_TAG` in `.env` and `docker compose pull` + `up -d` uses the SHA.

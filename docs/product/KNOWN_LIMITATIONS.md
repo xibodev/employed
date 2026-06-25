@@ -122,8 +122,7 @@ merges and deploys. **Remove from live via:** merge + deploy of
 ## KL-11 — Deploys use floating `:uat` image tags
 
 No SHA-pinned tags; rollback requires a rebuild instead of a tag flip
-(CARTO-003). GHCR images also still live under `mekjr1/`, not the `xibodev` org
-(CARTO-004). **Remove via:** BL-011, BL-012.
+(CARTO-003). **Remove via:** BL-011.
 
 ## KL-12 — Not registered with the xibodev-atlas control plane
 
