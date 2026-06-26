@@ -198,6 +198,44 @@ class GovernanceStack(Stack):
                 resources=["*"],
             )
         )
+        self.deploy_role.add_to_policy(
+            iam.PolicyStatement(
+                sid="ProdDeployAssets",
+                actions=["s3:PutObject"],
+                resources=[f"arn:aws:s3:::{product}-prod-deploy-assets-*/*"],
+            )
+        )
+        self.deploy_role.add_to_policy(
+            iam.PolicyStatement(
+                sid="ProdDeployParameters",
+                actions=["ssm:GetParameter", "ssm:PutParameter"],
+                resources=[f"arn:aws:ssm:*:{self.account}:parameter/{product}/prod/*"],
+            )
+        )
+        # SendCommand is scoped to THIS product's instances (shared account also
+        # runs sibling products — never let the employed CI role target theirs).
+        self.deploy_role.add_to_policy(
+            iam.PolicyStatement(
+                sid="ProdReleaseRunCommandDoc",
+                actions=["ssm:SendCommand"],
+                resources=["arn:aws:ssm:*::document/AWS-RunShellScript"],
+            )
+        )
+        self.deploy_role.add_to_policy(
+            iam.PolicyStatement(
+                sid="ProdReleaseRunCommandInstances",
+                actions=["ssm:SendCommand"],
+                resources=[f"arn:aws:ec2:*:{self.account}:instance/*"],
+                conditions={"StringEquals": {"ssm:resourceTag/Product": product}},
+            )
+        )
+        self.deploy_role.add_to_policy(
+            iam.PolicyStatement(
+                sid="ProdReleaseCommandStatus",
+                actions=["ssm:ListCommandInvocations", "ssm:GetCommandInvocation"],
+                resources=["*"],
+            )
+        )
 
         # ---------------------------------------------------------------
         # Outputs

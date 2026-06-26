@@ -1,0 +1,51 @@
+# Frontend deploy via Vercel CLI from CI, modeled on selopro.org.mz's
+# deploy-vercel.yml. Vercel builds the checked-out frontend source on its infra.
+#
+# Required GitHub secrets:
+#   VERCEL_TOKEN, VERCEL_ORG_ID, VERCEL_PROJECT_ID
+
+name: Deploy frontend to Vercel
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+    branches: [release]
+    paths:
+      - 'frontend/**'
+      - '.github/workflows/deploy-vercel.yml'
+
+concurrency:
+  group: employed-vercel-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: frontend
+    env:
+      NEXT_PUBLIC_API_URL: https://api.joinemployed.com
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify Vercel project bindings exist
+        run: |
+          set -euo pipefail
+          if [ -z "${VERCEL_ORG_ID:-}" ] || [ -z "${VERCEL_PROJECT_ID:-}" ]; then
+            echo "::error::VERCEL_ORG_ID + VERCEL_PROJECT_ID must be set as repository secrets."
+            exit 1
+          fi
+
+      - name: Install Vercel CLI
+        run: npm install -g vercel@latest
+
+      - name: Pull Vercel project settings
+        run: vercel pull --yes --environment=production --token="${{ secrets.VERCEL_TOKEN }}"
+
+      - name: Deploy to production
+        run: vercel deploy --prod --yes --token="${{ secrets.VERCEL_TOKEN }}" --env NEXT_PUBLIC_API_URL="${NEXT_PUBLIC_API_URL}"

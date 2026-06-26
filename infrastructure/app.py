@@ -31,6 +31,7 @@ from infrastructure.stacks.governance_stack import GovernanceStack
 from infrastructure.stacks.network_stack import NetworkStack
 from infrastructure.stacks.database_stack import DatabaseStack
 from infrastructure.stacks.budget_stack import BudgetStack
+from infrastructure.stacks.compute_stack import ComputeStack
 
 app = cdk.App()
 
@@ -112,5 +113,18 @@ BudgetStack(
     env=env,
     description=f"Employed per-stage cost guardrail (${_stage_budget:.0f} USD, CostCenter-scoped)",
 )
+
+if is_prod:
+    compute_stack = ComputeStack(
+        app,
+        "Employed-Compute-prod",
+        network_stack=network_stack,
+        database_stack=database_stack,
+        environment=environment,
+        env=env,
+        description="Employed production compute — single Graviton EC2 API box with Cloudflare Tunnel",
+    )
+    compute_stack.add_dependency(network_stack)
+    compute_stack.add_dependency(database_stack)
 
 app.synth()

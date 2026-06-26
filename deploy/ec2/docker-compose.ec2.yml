@@ -50,8 +50,9 @@ services:
     env_file:
       - .env
     healthcheck:
-      # Production allowed-hosts/CORS expects the public API host, so pass it.
-      test: ['CMD', 'curl', '-f', '-H', 'Host: api.joinemployed.com', 'http://localhost:8000/health']
+      # The backend image (python:3.12-slim + libpq5) has NO curl, so probe with
+      # urllib. /health is not host-restricted (no TrustedHostMiddleware).
+      test: ['CMD', 'python', '-c', "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"]
       interval: 30s
       timeout: 5s
       start_period: 30s
