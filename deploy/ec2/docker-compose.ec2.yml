@@ -1,0 +1,100 @@
+# =============================================================================
+# Employed — single-EC2 production API runtime (frontend is Vercel)
+# =============================================================================
+#
+# Runs the Employed backend on ONE EC2 box via docker compose, fronted by a
+# Cloudflare Tunnel (cloudflared) — NOT ECS/Fargate, NOT an ALB. The public
+# frontend is served by Vercel at joinemployed.com; this compose stack exposes
+# only the API tunnel route api.joinemployed.com -> http://api:8000.
+#
+# Config: every value comes from `.env`, which `render-env.sh` assembles from
+# SSM `/employed/prod/*` (SecureString where appropriate) + static non-secret
+# production defaults.
+#
+# Bring up:
+#   ./render-env.sh                         # writes /opt/employed/.env from SSM
+#   docker compose -f docker-compose.ec2.yml up -d
+#
+# `.env` is git-ignored and lives only on the box at /opt/employed/.env.
+
+name: employed-prod
+
+services:
+  # ---------------------------------------------------------------------------
+  # redis — internal arq queue/cache sidecar (not published; reachable only on
+  # the compose network as `redis:6379`).
+  # ---------------------------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ['redis-server', '--appendonly', 'yes']
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 15s
+      timeout: 3s
+      start_period: 5s
+      retries: 5
+
+  # ---------------------------------------------------------------------------
+  # api — FastAPI HTTP server. The backend image already defaults to uvicorn on
+  # :8000, so no command override is used here.
+  # ---------------------------------------------------------------------------
+  api:
+    image: ${EMPLOYED_API_IMAGE:?EMPLOYED_API_IMAGE is required (immutable ECR tag, e.g. prod-<sha>)}
+    restart: unless-stopped
+    depends_on:
+      redis:
+        condition: service_healthy
+    env_file:
+      - .env
+    healthcheck:
+      # The backend image (python:3.12-slim + libpq5) has NO curl, so probe with
+      # urllib. /health is not host-restricted (no TrustedHostMiddleware).
+      test: ['CMD', 'python', '-c', "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      start_period: 30s
+      retries: 3
+
+  # ---------------------------------------------------------------------------
+  # worker — arq background jobs (same image, different command).
+  # ---------------------------------------------------------------------------
+  worker:
+    image: ${EMPLOYED_API_IMAGE:?EMPLOYED_API_IMAGE is required (immutable ECR tag, e.g. prod-<sha>)}
+    restart: unless-stopped
+    command: ['arq', 'app.workers.config.WorkerSettings']
+    depends_on:
+      redis:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+    env_file:
+      - .env
+    healthcheck:
+      test:
+        [
+          'CMD-SHELL',
+          'python -c "import os, redis; redis.Redis.from_url(os.environ[''REDIS_URL''], socket_connect_timeout=2, socket_timeout=2).ping()"',
+        ]
+      interval: 30s
+      timeout: 10s
+      start_period: 20s
+      retries: 3
+
+  # ---------------------------------------------------------------------------
+  # cloudflared — Cloudflare Tunnel. Dials OUT to Cloudflare and forwards
+  # api.joinemployed.com -> http://api:8000. The apex joinemployed.com is served
+  # by Vercel and is intentionally not routed through this tunnel.
+  # ---------------------------------------------------------------------------
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    command: ['tunnel', '--no-autoupdate', 'run', '--token', '${CLOUDFLARED_TOKEN:?CLOUDFLARED_TOKEN is required}']
+    depends_on:
+      api:
+        condition: service_healthy
+
+volumes:
+  redis-data:

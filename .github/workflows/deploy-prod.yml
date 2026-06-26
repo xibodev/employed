@@ -1,0 +1,141 @@
+# Production deploy to AWS EC2.
+#
+# Required GitHub secrets:
+#   AWS_DEPLOY_ROLE_ARN
+
+name: Deploy Prod
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+
+concurrency:
+  group: deploy-prod
+  cancel-in-progress: false
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: us-east-1
+  ECR_REPOSITORY: employed-api
+  IMAGE_TAG: prod-${{ github.sha }}
+
+jobs:
+  ci:
+    uses: ./.github/workflows/ci.yml
+    secrets: inherit
+
+  build-push:
+    needs: ci
+    runs-on: ubuntu-latest
+    environment: prod
+    outputs:
+      registry: ${{ steps.login-ecr.outputs.registry }}
+      image-uri: ${{ steps.image.outputs.uri }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build and push backend image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          platforms: linux/arm64
+          push: true
+          tags: |
+            ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:prod
+            ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }}
+
+      - name: Record image URI
+        id: image
+        run: echo "uri=${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }}" >> "$GITHUB_OUTPUT"
+
+      - name: Upload EC2 deploy assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          bucket="$(aws ssm get-parameter --name /employed/prod/DEPLOY_ASSETS_BUCKET --query 'Parameter.Value' --output text --region "$AWS_REGION")"
+          aws s3 cp deploy/ec2/docker-compose.ec2.yml "s3://${bucket}/ec2/docker-compose.ec2.yml" --region "$AWS_REGION"
+          aws s3 cp deploy/ec2/render-env.sh "s3://${bucket}/ec2/render-env.sh" --region "$AWS_REGION"
+
+      - name: Publish deploy image tag
+        run: aws ssm put-parameter --name /employed/prod/DEPLOY_IMAGE_TAG --type String --value "${IMAGE_TAG}" --overwrite --region "$AWS_REGION"
+
+  release:
+    needs: build-push
+    runs-on: ubuntu-latest
+    environment: prod
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Restart services through SSM Run Command
+        id: run-command
+        shell: bash
+        env:
+          ECR_REGISTRY: ${{ needs.build-push.outputs.registry }}
+        run: |
+          set -euo pipefail
+          command_id="$(
+            aws ssm send-command \
+              --region "$AWS_REGION" \
+              --document-name AWS-RunShellScript \
+              --targets "Key=tag:Product,Values=employed" "Key=tag:Env,Values=prod" \
+              --comment "Employed prod deploy ${GITHUB_SHA}" \
+              --parameters commands="[
+                \"set -euo pipefail\",
+                \"cd /opt/employed\",
+                \"export EMPLOYED_API_IMAGE=${ECR_REGISTRY}/${ECR_REPOSITORY}:${IMAGE_TAG}\",
+                \"./render-env.sh /opt/employed/.env\",
+                \"aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ${ECR_REGISTRY}\",
+                \"docker compose pull\",
+                \"docker compose up -d\",
+                \"for i in \$(seq 1 20); do s=\$(docker inspect -f '{{.State.Health.Status}}' \$(docker compose ps -q api) 2>/dev/null || echo starting); [ \\\"\$s\\\" = healthy ] && exit 0; echo waiting-\$i-\$s; sleep 6; done\",
+                \"docker compose ps\",
+                \"exit 1\"
+              ]" \
+              --query Command.CommandId \
+              --output text
+          )"
+          echo "command-id=${command_id}" >> "$GITHUB_OUTPUT"
+
+      - name: Wait for SSM command success
+        shell: bash
+        run: |
+          set -euo pipefail
+          command_id="${{ steps.run-command.outputs.command-id }}"
+          for i in $(seq 1 40); do
+            invocations="$(aws ssm list-command-invocations --region "$AWS_REGION" --command-id "$command_id" --details)"
+            status="$(jq -r '.CommandInvocations[0].Status // "Pending"' <<< "$invocations")"
+            echo "SSM command status: ${status}"
+            case "$status" in
+              Success) exit 0 ;;
+              Failed|Cancelled|TimedOut|Cancelling)
+                jq -r '.CommandInvocations[0].CommandPlugins[]?.Output // empty' <<< "$invocations"
+                exit 1
+                ;;
+            esac
+            sleep 15
+          done
+          echo "Timed out waiting for SSM command."
+          exit 1
+
+      - name: Public API smoke test
+        run: curl --fail --show-error --silent https://api.joinemployed.com/health
