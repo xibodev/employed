@@ -1,0 +1,8 @@
+# CDK
+.venv/
+cdk.out/
+cdk.out.*/
+*.pyc
+__pycache__/
+.pytest_cache/
+cdk.context.json

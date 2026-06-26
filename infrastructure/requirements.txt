@@ -1,0 +1,7 @@
+# Employed AWS infrastructure (CDK Python).
+# Pin majors to keep `cdk synth` reproducible across machines + CI.
+aws-cdk-lib>=2.150.0,<3.0.0
+constructs>=10.0.0,<11.0.0
+
+# Test-only (cdk synth assertions); harmless in the deploy venv.
+pytest>=8.0.0
