@@ -60,6 +60,17 @@ class Settings(BaseSettings):
     sentry_dsn: str | None = Field(default=None, alias="SENTRY_DSN")
     sentry_environment: str | None = Field(default=None, alias="SENTRY_ENVIRONMENT")
 
+    # Resume artifact storage (R14). Durable, S3-compatible object storage for
+    # rendered resume PDFs. Backend is Cloudflare R2 in production; falls back to
+    # local disk when not configured (dev/test/CI). Values are seeded out-of-band
+    # in SSM SecureStrings (never in the repo).
+    resume_storage_backend: str = Field(default="local", alias="RESUME_STORAGE_BACKEND")
+    resume_s3_bucket: str | None = Field(default=None, alias="RESUME_S3_BUCKET")
+    resume_s3_endpoint_url: str | None = Field(default=None, alias="RESUME_S3_ENDPOINT_URL")
+    resume_s3_access_key_id: str | None = Field(default=None, alias="RESUME_S3_ACCESS_KEY_ID")
+    resume_s3_secret_access_key: str | None = Field(default=None, alias="RESUME_S3_SECRET_ACCESS_KEY")
+    resume_s3_region: str = Field(default="auto", alias="RESUME_S3_REGION")
+
     # Privacy: salt used to hash MSISDN / IP before logging
     ip_salt: str | None = Field(default=None, alias="IP_SALT")
 
