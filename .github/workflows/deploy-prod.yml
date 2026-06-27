@@ -44,6 +44,22 @@ jobs:
           role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
+      - name: Validate required prod secrets are present
+        shell: bash
+        run: |
+          set -euo pipefail
+          missing=""
+          while read -r n; do
+            [ -z "$n" ] && continue
+            case "$n" in \#*) continue ;; esac
+            aws ssm get-parameter --name "/employed/prod/$n" --region "$AWS_REGION" >/dev/null 2>&1 || missing="$missing $n"
+          done < deploy/ec2/required-secrets.txt
+          if [ -n "$missing" ]; then
+            echo "::error::Missing required SSM secrets under /employed/prod/:$missing"
+            exit 1
+          fi
+          echo "All required /employed/prod/* secrets are present."
+
       - name: Login to Amazon ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
