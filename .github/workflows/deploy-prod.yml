@@ -71,6 +71,7 @@ jobs:
           bucket="$(aws ssm get-parameter --name /employed/prod/DEPLOY_ASSETS_BUCKET --query 'Parameter.Value' --output text --region "$AWS_REGION")"
           aws s3 cp deploy/ec2/docker-compose.ec2.yml "s3://${bucket}/ec2/docker-compose.ec2.yml" --region "$AWS_REGION"
           aws s3 cp deploy/ec2/render-env.sh "s3://${bucket}/ec2/render-env.sh" --region "$AWS_REGION"
+          aws s3 cp deploy/ec2/bootstrap.sh "s3://${bucket}/ec2/bootstrap.sh" --region "$AWS_REGION"
 
       - name: Publish deploy image tag
         run: aws ssm put-parameter --name /employed/prod/DEPLOY_IMAGE_TAG --type String --value "${IMAGE_TAG}" --overwrite --region "$AWS_REGION"
@@ -86,13 +87,14 @@ jobs:
           role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Restart services through SSM Run Command
+      - name: Release through SSM Run Command
         id: run-command
         shell: bash
-        env:
-          ECR_REGISTRY: ${{ needs.build-push.outputs.registry }}
         run: |
           set -euo pipefail
+          # Single source of truth: re-run the box's own bootstrap.sh, which is
+          # idempotent and handles login + pull + alembic migrate + up + health.
+          bucket="$(aws ssm get-parameter --name /employed/prod/DEPLOY_ASSETS_BUCKET --query 'Parameter.Value' --output text --region "$AWS_REGION")"
           command_id="$(
             aws ssm send-command \
               --region "$AWS_REGION" \
@@ -100,16 +102,10 @@ jobs:
               --targets "Key=tag:Product,Values=employed" "Key=tag:Env,Values=prod" \
               --comment "Employed prod deploy ${GITHUB_SHA}" \
               --parameters commands="[
-                \"set -euo pipefail\",
-                \"cd /opt/employed\",
-                \"export EMPLOYED_API_IMAGE=${ECR_REGISTRY}/${ECR_REPOSITORY}:${IMAGE_TAG}\",
-                \"./render-env.sh /opt/employed/.env\",
-                \"aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ${ECR_REGISTRY}\",
-                \"docker compose pull\",
-                \"docker compose up -d\",
-                \"for i in \$(seq 1 20); do s=\$(docker inspect -f '{{.State.Health.Status}}' \$(docker compose ps -q api) 2>/dev/null || echo starting); [ \\\"\$s\\\" = healthy ] && exit 0; echo waiting-\$i-\$s; sleep 6; done\",
-                \"docker compose ps\",
-                \"exit 1\"
+                \"set -euxo pipefail\",
+                \"aws s3 cp s3://${bucket}/ec2/bootstrap.sh /tmp/bootstrap.sh --region ${AWS_REGION}\",
+                \"chmod +x /tmp/bootstrap.sh\",
+                \"bash /tmp/bootstrap.sh\"
               ]" \
               --query Command.CommandId \
               --output text
