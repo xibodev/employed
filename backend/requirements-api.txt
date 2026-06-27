@@ -16,3 +16,6 @@ jinja2==3.1.4
 # renderer in app/services/resume_templates.py prefers WeasyPrint if present,
 # then xhtml2pdf, then a built-in text fallback; this pins the working engine.
 xhtml2pdf==0.2.16
+# S3-compatible client for durable resume-artifact storage on Cloudflare R2
+# (app/services/resume_storage.py). Range matches the portfolio convention.
+boto3>=1.34,<2.0

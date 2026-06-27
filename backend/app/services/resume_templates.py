@@ -486,22 +486,39 @@ def build_resume_artifact(
 
     The returned mapping is JSON-serialisable so it can travel back through the
     arq result backend and be handed to an endpoint as a download descriptor.
+
+    Storage selection:
+    - When an explicit ``artifact_dir`` is given, the PDF is written there (used
+      by tests and any caller that wants a specific local path).
+    - Otherwise, when R2/S3 resume storage is configured, the PDF is uploaded to
+      durable object storage (survives EC2 restarts) and the reference carries
+      ``storage="r2"`` + ``bucket`` + ``key``.
+    - Otherwise it falls back to the local default directory (dev/test/CI).
     """
+    from app.services import resume_storage
+
     template = get_resume_template(template_id)
     pdf_bytes = render_resume_pdf_bytes(json_resume, template.id)
-
-    directory = Path(artifact_dir) if artifact_dir is not None else default_artifact_dir()
-    directory.mkdir(parents=True, exist_ok=True)
     filename = f"resume-{profile_version_id}-{template.id}.pdf"
-    path = directory / filename
-    path.write_bytes(pdf_bytes)
 
-    return {
+    reference: dict[str, Any] = {
         "profile_version_id": str(profile_version_id),
         "template_id": template.id,
         "filename": filename,
         "content_type": "application/pdf",
-        "artifact_path": str(path),
         "size_bytes": len(pdf_bytes),
         "rendered_at": datetime.now(timezone.utc).isoformat(),
     }
+
+    if artifact_dir is None and resume_storage.is_configured():
+        key = resume_storage.object_key(str(profile_version_id), filename)
+        upload = resume_storage.upload_pdf(pdf_bytes, key=key, content_type="application/pdf")
+        reference.update({"storage": upload["storage"], "bucket": upload["bucket"], "key": upload["key"]})
+        return reference
+
+    directory = Path(artifact_dir) if artifact_dir is not None else default_artifact_dir()
+    directory.mkdir(parents=True, exist_ok=True)
+    path = directory / filename
+    path.write_bytes(pdf_bytes)
+    reference.update({"storage": "local", "artifact_path": str(path)})
+    return reference
