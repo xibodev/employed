@@ -38,12 +38,19 @@ services:
       retries: 5
 
   # ---------------------------------------------------------------------------
-  # api — FastAPI HTTP server. The backend image already defaults to uvicorn on
-  # :8000, so no command override is used here.
+  # api — FastAPI HTTP server (uvicorn on :8000). The command overrides the
+  # image default to trust the Cloudflare Tunnel proxy headers (see below).
   # ---------------------------------------------------------------------------
   api:
     image: ${EMPLOYED_API_IMAGE:?EMPLOYED_API_IMAGE is required (immutable ECR tag, e.g. prod-<sha>)}
     restart: unless-stopped
+    # Trust the Cloudflare Tunnel's X-Forwarded-Proto/For. cloudflared reaches the
+    # api from another compose-network IP (not 127.0.0.1), so uvicorn's default
+    # --forwarded-allow-ips=127.0.0.1 would drop the headers and build http:// in
+    # request.url_for (breaking OAuth redirect_uri + any absolute URL). The api
+    # port is never published to the host, so the only possible peer is cloudflared.
+    command:
+      ['uvicorn', 'app.main:app', '--host', '0.0.0.0', '--port', '8000', '--proxy-headers', '--forwarded-allow-ips', '*']
     depends_on:
       redis:
         condition: service_healthy
