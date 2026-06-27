@@ -2,9 +2,12 @@
 
 RDS for PostgreSQL **17**, ``db.t4g.micro``, **Single-AZ**, in the network
 stack's PRIVATE_ISOLATED subnets, reachable only from the service SG (5432).
-Master credentials are generated into Secrets Manager (never in the repo); the
-deploy path assembles them + the endpoint into the SSM SecureString
-``/employed/<env>/DATABASE_URL`` that the api container consumes.
+Master credentials are NOT stored in Secrets Manager (avoids the $0.40/mo
+per-secret charge). The master password is a FREE SSM ``SecureString``
+``/employed/<env>/db-master-password`` (seeded out-of-band before this stack
+deploys); CDK wires it via ``rds.Credentials.from_password`` + an ssm-secure
+dynamic reference. The deploy path assembles the full
+``/employed/<env>/DATABASE_URL`` SecureString that the api container consumes.
 
 Per-stage hardening:
   * **uat**  — 7-day snapshots, removal ``DESTROY`` (clean teardown).
@@ -17,6 +20,7 @@ from aws_cdk import (
     Duration,
     RemovalPolicy,
     CfnOutput,
+    SecretValue,
     aws_ec2 as ec2,
     aws_rds as rds,
 )
@@ -60,8 +64,13 @@ class DatabaseStack(Stack):
             storage_type=rds.StorageType.GP3,
             database_name=DB_NAME,
             port=DB_PORT,
-            credentials=rds.Credentials.from_generated_secret(
-                "employed_admin", secret_name=f"employed/{environment}/rds-master"
+            credentials=rds.Credentials.from_password(
+                "employed_admin",
+                # Master password is a FREE SSM SecureString (seeded out-of-band
+                # by the deploy path), NOT a Secrets Manager secret — avoids the
+                # $0.40/mo per-secret charge. CFN resolves the ssm-secure dynamic
+                # reference at deploy; the plaintext never enters the template.
+                SecretValue.ssm_secure(f"/employed/{environment}/db-master-password"),
             ),
             backup_retention=Duration.days(14 if is_prod else 7),
             deletion_protection=is_prod,
