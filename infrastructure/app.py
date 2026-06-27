@@ -26,6 +26,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import aws_cdk as cdk
+from aws_cdk import aws_servicecatalogappregistry as appregistry
 
 from infrastructure.stacks.governance_stack import GovernanceStack
 from infrastructure.stacks.network_stack import NetworkStack
@@ -69,7 +70,7 @@ cdk.Tags.of(app).add("Env", environment)
 cdk.Tags.of(app).add("ManagedBy", "cdk")
 
 # --- Account-wide governance (deployed ONCE, no env suffix) -------------
-GovernanceStack(
+governance = GovernanceStack(
     app,
     "Employed-Governance",
     product="employed",
@@ -104,7 +105,7 @@ database_stack.add_dependency(network_stack)
 
 # --- Per-stage budget guardrail ----------------------------------------
 _stage_budget = 80.0 if is_prod else 50.0
-BudgetStack(
+budget_stack = BudgetStack(
     app,
     f"Employed-Budget-{environment}",
     environment=environment,
@@ -126,5 +127,23 @@ if is_prod:
     )
     compute_stack.add_dependency(network_stack)
     compute_stack.add_dependency(database_stack)
+
+# --- AppRegistry: associate every stack with the "Employed" application -----
+# Codified so the myApplications "single pane" is re-established on every deploy
+# (survives restarts/redeploys) instead of relying on a one-off CLI association.
+# Each stack owns its own CFN_STACK association, importing the application id
+# from Governance. resource=stack_id resolves to the stack's own ARN.
+_app_id = governance.application.attr_id
+_associated = [governance, network_stack, database_stack, budget_stack]
+if is_prod:
+    _associated.append(compute_stack)
+for _stack in _associated:
+    appregistry.CfnResourceAssociation(
+        _stack,
+        "AppRegistryAssociation",
+        application=_app_id,
+        resource=_stack.stack_id,
+        resource_type="CFN_STACK",
+    )
 
 app.synth()
