@@ -44,7 +44,14 @@ _state_lock = Lock()
 
 
 def _setting(provider: str, suffix: str):
-    return getattr(settings, f"{provider.upper()}_{suffix}", None)
+    # Pydantic-settings fields are snake_case (e.g. ``google_client_id``); the
+    # env aliases are upper-case. Attribute access must use the field name, so
+    # resolve the snake_case field first and fall back to the upper-case name —
+    # mirrors the _setting helpers in payments/webhooks/jobs (EMP-002). Without
+    # this, ``getattr(settings, "GOOGLE_CLIENT_ID")`` always returned None and
+    # every OAuth start 503'd with "OAuth is not configured".
+    field = f"{provider}_{suffix}".lower()
+    return getattr(settings, field, getattr(settings, f"{provider.upper()}_{suffix}", None))
 
 
 def _utcnow() -> datetime:

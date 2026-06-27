@@ -31,17 +31,21 @@ def init_sentry() -> None:
     environment = os.getenv("SENTRY_ENVIRONMENT", "uat")
     traces_sample_rate = float(os.getenv("SENTRY_TRACES_SAMPLE_RATE", "0.1"))
 
-    sentry_sdk.init(
-        dsn=dsn,
-        environment=environment,
-        traces_sample_rate=traces_sample_rate,
-        integrations=[
-            FastApiIntegration(),
-            SqlalchemyIntegration(),
-        ],
-        # Do not send PII by default
-        send_default_pii=False,
-    )
+    try:
+        sentry_sdk.init(
+            dsn=dsn,
+            environment=environment,
+            traces_sample_rate=traces_sample_rate,
+            integrations=[
+                FastApiIntegration(),
+                SqlalchemyIntegration(),
+            ],
+            # Do not send PII by default
+            send_default_pii=False,
+        )
+    except Exception:  # noqa: BLE001 — observability must never take down the app
+        logger.exception("observability.sentry: init failed — continuing without error tracking")
+        return
     logger.info(
         "observability.sentry: initialised environment=%s traces_sample_rate=%s", environment, traces_sample_rate
     )
