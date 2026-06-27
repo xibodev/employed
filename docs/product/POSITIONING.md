@@ -1,70 +1,33 @@
 # Employed — Product Positioning
 
 ```yaml
-last_verified: 2026-06-19T00:00:00Z
-verified_by: multi-tenant-hiring-platform implementation complete
-scope: hiring-platform features fully implemented and deployed
+last_verified: 2026-06-27T00:00:00Z
+git_ref: master
+verified_by: prod documentation refresh
 ```
 
 ## One line
 
-**More than a job board, less than a heavy ATS.** Employed lets organizations
-reliably hire people in localized markets without the overhead of a full
-Applicant Tracking System — while staying exportable *into* one.
+Employed is more than a job board and less than a heavy ATS: a trust-centric, integration-ready hiring platform for localized markets.
 
-## Where we sit
+## Current product
 
-```
- classifieds / free        Employed                 full ATS
- job boards          (trust + light pipeline)   (Greenhouse, Lever, …)
- ─────────────────●────────────●────────────────────●─────────────▶
-   no verification,         verification badges,        heavy workflow,
-   no pipeline,             a lightweight, exportable   per-seat pricing,
-   easy to spam             applications pipeline        migration lock-in
-```
+Employed serves Mozambique and Mexico from `joinemployed.com`. The platform combines localized job listings with company management, memberships, permission-based RBAC, verification badges, JSON Resume profiles, an application pipeline, audit logs, webhooks, and export APIs.
 
-The platform delivers the **full hiring-platform feature set**: multi-tenant company
-management with membership workflows, two-layer RBAC authorization, per-entity
-verification state machine with trust badges, version-controlled JSON Resume
-profiles, lightweight applications pipeline with recruiter workflow, append-only
-audit trail, outbound webhooks, and versioned export API. The original job board
-core (multilingual, subdomain-localized for **Mozambique (MZ)** and **Mexico (MX)**
-with admin moderation and featured listing payments) is preserved unchanged.
+## Differentiators
 
-## Two differentiators
+1. **Trust.** Companies, jobs, and profiles use a shared verification state machine and composable badges instead of a single opaque score.
+2. **Portability.** JSON Resume, schema.org `JobPosting`, normalized Application objects, `external_refs`, webhooks, and `/export/v1` keep the platform integration-ready.
+3. **Localized simplicity.** Market, locale, pricing, and payment providers come from hostnames while tenant permissions remain company-scoped.
 
-1. **Trust.** A per-entity verification state machine (`unverified → pending →
-   verified / rejected / revoked / flagged`) and **composable, named trust
-   badges** — never a single opaque score — signal that companies, jobs, and
-   candidates are legitimate. Company domain verification (DNS TXT or matching
-   member emails) is the low-friction anchor; manual business-document review is
-   a higher tier.
+## Boundaries
 
-2. **Portability / integration-readiness.** Standard schemas at every boundary
-   (JSON Resume for candidates, schema.org `JobPosting` JSON-LD for jobs, a
-   normalized Application object), an `external_refs` field on every major
-   entity (map to external ATS ids with no migration), outbound webhooks for key
-   events, and a versioned read-only export API. Data can move into a full ATS
-   without a migration, so adopting Employed is never a lock-in decision.
+- Not a full ATS: the pipeline is intentionally lightweight.
+- Not single-tenant: companies and memberships are first-class.
+- Not a lock-in system: data export and webhooks are core product surfaces.
 
-## What this is NOT (deliberate scope boundaries)
+## Markets
 
-- **Not a full ATS.** The applications pipeline is intentionally lightweight —
-  five fixed stages (`applied → reviewed → shortlisted → rejected → hired`), list
-  + kanban views, no complex workflow engine, scorecards, or per-seat billing.
-- **Not a single-tenant tool.** Multi-tenancy (`Company` + `Membership`) and a
-  two-layer RBAC model are first-class, but **market** (geography/locale/payment)
-  and **tenant** (organization/permission boundary) stay orthogonal — a company
-  belongs to one market; tenancy is never derived from the hostname.
-- **Not lock-in.** Email-apply stays available alongside the tracked pipeline
-  (applications default to tracked, but never silently fall back between
-  channels). Everything is exportable.
-
-## Markets & languages (unchanged)
-
-- Markets resolved by subdomain: `mx.*` → MX, `mz.*` → MZ (default MZ).
-- Locales: **`en`, `pt`, `es` only** (MX default `es`, MZ default `pt`).
-
-See also: `USER_TYPES_AND_JOURNEYS.md`, `../architecture/RBAC_AND_TENANCY.md`,
-`../architecture/VERIFICATION_AND_TRUST.md`,
-`../architecture/INTEGRATION_AND_EXPORT.md`.
+- `joinemployed.com` and `mz.joinemployed.com`: MZ, default `pt`.
+- `mx.joinemployed.com`: MX, default `es`.
+- Supported locale codes: `en`, `pt`, `es`.

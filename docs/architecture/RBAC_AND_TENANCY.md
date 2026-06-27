@@ -1,6 +1,6 @@
 ---
-last_verified: 2026-06-16T00:00:00Z
-git_ref: working-tree (multi-tenant-hiring-platform spec)
+last_verified: 2026-06-27T00:00:00Z
+git_ref: master
 verified_by: multi-tenant-hiring-platform spec — task 19.1 documentation sweep
 ---
 
