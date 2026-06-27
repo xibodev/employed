@@ -1,4 +1,4 @@
-<!-- last_verified: 2026-06-11T02:02:49Z | git_ref: fix/quality-run-2026-06-10 | verified_by: doc-drift audit, quality run 2026-06-10_120309 -->
+<!-- last_verified: 2026-06-27T00:00:00Z| git_ref: master| verified_by: doc-drift audit, quality run 2026-06-10_120309 -->
 
 # Tests
 

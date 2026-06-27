@@ -1,6 +1,6 @@
 ---
-last_verified: 2026-06-14T00:00:00Z
-git_ref: working-tree (fix/quality-run-2026-06-10 lineage; uat baseline 00aa899)
+last_verified: 2026-06-27T00:00:00Z
+git_ref: master
 verified_by: codebase-cartographer — FP-CARTO-007 doc refresh (2026-06-14)
 ---
 

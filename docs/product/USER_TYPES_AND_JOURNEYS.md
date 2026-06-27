@@ -1,7 +1,7 @@
 # Employed — User Types & Journeys
 
 ```yaml
-last_verified: 2026-06-16T00:00:00Z
+last_verified: 2026-06-27T00:00:00Z
 verified_by: multi-tenant-hiring-platform spec — task 19.1 documentation sweep
 scope: hiring-platform evolution (multi-tenant-hiring-platform spec)
 ```
