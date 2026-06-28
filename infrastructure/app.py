@@ -25,14 +25,43 @@ from pathlib import Path
 # stable for stack modules.
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+import jsii
 import aws_cdk as cdk
+from aws_cdk import aws_ec2 as ec2
 from aws_cdk import aws_servicecatalogappregistry as appregistry
+from constructs import IConstruct
 
 from infrastructure.stacks.governance_stack import GovernanceStack
 from infrastructure.stacks.network_stack import NetworkStack
 from infrastructure.stacks.database_stack import DatabaseStack
 from infrastructure.stacks.budget_stack import BudgetStack
 from infrastructure.stacks.compute_stack import ComputeStack
+
+
+@jsii.implements(cdk.IAspect)
+class TagLaunchTemplateLaunchedResources:
+    """Propagate the standard tag set to resources launched from a launch template.
+
+    CDK satisfies ``require_imdsv2`` by creating an ``AWS::EC2::LaunchTemplate``
+    via an aspect that runs during synthesis — after the app-level ``Tags`` aspect
+    — so the launch template, the root EBS volume, and the primary ENI escape the
+    standard tag set. Running as an aspect (visited after the launch template
+    exists) lets us inject ``LaunchTemplateData.TagSpecifications`` so every
+    instance/volume/ENI created at launch is tagged, and tag the template itself.
+    """
+
+    def __init__(self, tags: dict[str, str]) -> None:
+        self._cfn_tags = [{"Key": k, "Value": v} for k, v in tags.items()]
+
+    def visit(self, node: IConstruct) -> None:
+        if isinstance(node, ec2.CfnLaunchTemplate):
+            node.add_property_override(
+                "LaunchTemplateData.TagSpecifications",
+                [
+                    {"ResourceType": rt, "Tags": self._cfn_tags}
+                    for rt in ("instance", "volume", "network-interface")
+                ],
+            )
 
 app = cdk.App()
 
@@ -68,6 +97,19 @@ cdk.Tags.of(app).add("Product", "employed")
 cdk.Tags.of(app).add("CostCenter", f"employed-{environment}")
 cdk.Tags.of(app).add("Env", environment)
 cdk.Tags.of(app).add("ManagedBy", "cdk")
+
+# Tag launch-template-launched resources (instance/volume/ENI) that the imdsv2
+# launch template would otherwise leave untagged (see the aspect docstring).
+cdk.Aspects.of(app).add(
+    TagLaunchTemplateLaunchedResources(
+        {
+            "Product": "employed",
+            "CostCenter": f"employed-{environment}",
+            "Env": environment,
+            "ManagedBy": "cdk",
+        }
+    )
+)
 
 # --- Account-wide governance (deployed ONCE, no env suffix) -------------
 governance = GovernanceStack(

@@ -129,6 +129,13 @@ class ComputeStack(Stack):
         instance.node.add_dependency(database_stack.instance)
 
         Tags.of(instance).add("Name", f"employed-{environment}-api")
+        # NOTE: CDK satisfies require_imdsv2 by creating a launch template via an
+        # aspect that runs DURING synthesis — after both __init__ and the app-level
+        # Tags aspect — so the launch template, the root EBS volume, and the primary
+        # ENI escape the standard tag set. They are tagged by the app-level
+        # TagLaunchTemplateLaunchedResources aspect (see infrastructure/app.py), which
+        # injects LaunchTemplateData.TagSpecifications so instances/volumes/ENIs
+        # launched from the template are tagged at creation.
 
         CfnOutput(
             self,
