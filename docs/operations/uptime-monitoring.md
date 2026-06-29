@@ -1,10 +1,10 @@
-<!-- last_verified: 2026-06-27T00:00:00Z| git_ref: master| verified_by: prod documentation refresh -->
+<!-- last_verified: 2026-06-28T00:00:00Z| git_ref: master| verified_by: prod documentation refresh -->
 
 # Uptime Monitoring — Employed
 
 Gatus is the uptime monitoring standard for Employed.
 
-## Production checks to wire
+## Production checks
 
 | Endpoint | Expected result |
 |----------|-----------------|
@@ -16,7 +16,7 @@ Gatus is the uptime monitoring standard for Employed.
 
 ## Current state
 
-The app exposes the health endpoints. Gatus checks for the production URLs are not yet configured.
+Gatus is live. The atlas-driven group "Employed" monitors apex, www/mx/mz market hosts, and `api.joinemployed.com/health`.
 
 ## Alert expectations
 

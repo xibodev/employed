@@ -1,4 +1,4 @@
-<!-- last_verified: 2026-06-27T00:00:00Z| git_ref: master
+<!-- last_verified: 2026-06-28T00:00:00Z| git_ref: master
 
 # Employed — TODO
 
@@ -6,11 +6,9 @@ Current open items only.
 
 ## Operator / production
 
-- [ ] Wire Bugsink: create/confirm `employed-api` and `employed-web` projects, set production `SENTRY_DSN` values, and set `SENTRY_ENVIRONMENT=production`.
-- [ ] Wire Gatus monitors for `https://joinemployed.com/` and `https://api.joinemployed.com/health`.
 - [ ] Confirm Google OAuth and reCAPTCHA allowed origins include `mx.joinemployed.com` and `mz.joinemployed.com` if users authenticate directly on market hosts.
 - [ ] Replace Stripe test keys with live keys and verify the live webhook when monetisation starts.
-- [ ] Decide on persistent media storage for resume PDF artifacts; current artifacts are local/ephemeral on the EC2 host.
+- [ ] Add a user-facing resume download endpoint; PDFs already persist to the R2 bucket `employed-prod-resumes` but no serve route exists.
 - [ ] Confirm M-Pesa/e-Mola sandbox or live credentials before claiming real mobile-money processing.
 
 ## Engineering
@@ -21,5 +19,4 @@ Current open items only.
 
 ## Later
 
-- [ ] Evaluate Cloudflare R2 for durable media storage.
 - [ ] Add performance budgets and CDN/cache rules once traffic justifies them.

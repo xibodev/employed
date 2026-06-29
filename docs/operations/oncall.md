@@ -1,5 +1,5 @@
 ---
-last_verified: 2026-06-27T00:00:00Z
+last_verified: 2026-06-28T00:00:00Z
 git_ref: master
 verified_by: prod documentation refresh
 ---
@@ -10,8 +10,8 @@ verified_by: prod documentation refresh
 
 | Layer | Tool | Status |
 |-------|------|--------|
-| Error tracking | Bugsink via `SENTRY_DSN` | SDKs are wired; DSN is empty, so events do not flow yet |
-| Uptime monitoring | Gatus | Production checks are not wired yet |
+| Error tracking | Bugsink via `SENTRY_DSN` | Live; project `employed-api` at `https://errors.xibodev.com`, environment `production` |
+| Uptime monitoring | Gatus | Live; monitors apex, market hosts, and API health |
 | Backend health | `https://api.joinemployed.com/health` | returns API/DB/Redis status when healthy |
 | Deployment | GitHub Actions + AWS OIDC + SSM Run Command | production backend deploy path |
 
@@ -19,7 +19,7 @@ verified_by: prod documentation refresh
 
 1. API health check fails for two consecutive intervals.
 2. Frontend apex fails for two consecutive intervals.
-3. Bugsink receives a new high-severity issue or an error-rate spike after DSNs are wired.
+3. Bugsink receives a new high-severity issue or an error-rate spike.
 4. RDS CPU/storage/connection alarms breach thresholds.
 5. AWS budget alerts reach configured tiers.
 

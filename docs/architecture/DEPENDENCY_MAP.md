@@ -1,5 +1,5 @@
 ---
-last_verified: 2026-06-27T00:00:00Z
+last_verified: 2026-06-28T00:00:00Z
 git_ref: master
 verified_by: prod documentation refresh
 ---
@@ -21,12 +21,12 @@ verified_by: prod documentation refresh
 | M-Pesa / e-Mola | MZ mobile-money payment options | simulator mode |
 | Google OAuth | Social sign-in | web client for apex/www origins and API callback |
 | reCAPTCHA v3 | Anonymous job-posting abuse protection | domain `joinemployed.com` |
-| Bugsink | Error tracking standard | SDK-compatible DSN variable exists; DSN empty so no-op |
-| Gatus | Uptime standard | production monitors not yet wired |
+| Bugsink | Error tracking standard | live; backend DSN set in SSM, project `employed-api` |
+| Gatus | Uptime standard | live; monitors apex/market hosts and API health |
 
 ## Backend packages
 
-FastAPI/uvicorn serve the API. SQLAlchemy, psycopg2, and Alembic handle PostgreSQL. `arq` and `redis` power background jobs and distributed state. `stripe`, `httpx`, `bcrypt`, `python-jose`, `bleach`, and `pydantic-settings` support payments, external calls, auth, sanitization, and settings. `sentry-sdk[fastapi]` remains the Bugsink-compatible client and is DSN-gated.
+FastAPI/uvicorn serve the API. SQLAlchemy, psycopg2, and Alembic handle PostgreSQL. `arq` and `redis` power background jobs and distributed state. `stripe`, `httpx`, `bcrypt`, `python-jose`, `bleach`, and `pydantic-settings` support payments, external calls, auth, sanitization, and settings. `boto3` uploads resume PDFs to Cloudflare R2. `sentry-sdk[fastapi]` is the Bugsink client (active in prod); `jinja2` is pinned because the Sentry FastAPI integration requires it.
 
 ## Frontend packages
 
@@ -41,7 +41,7 @@ worker ───────────────► email, webhook, expiry, 
 payments routers ─────► Stripe / mobile-money simulators
 OAuth/reCAPTCHA ──────► Google endpoints
 email service ────────► AWS SES SMTP
-observability SDKs ───► Bugsink when SENTRY_DSN is set
+observability SDKs ───► Bugsink (SENTRY_DSN set)
 ```
 
 ## Deployment dependencies
