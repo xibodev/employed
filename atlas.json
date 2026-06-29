@@ -24,5 +24,5 @@
     "cloudflare",
     "vercel"
   ],
-  "notes": "Employed is live at joinemployed.com. Frontend runs on Vercel; API runs on an isolated AWS us-east-1 EC2/RDS stack with Cloudflare Tunnel ingress and SSM SecureString runtime secrets."
+  "notes": "Employed is live at joinemployed.com. Frontend runs on Vercel; API runs on an isolated AWS us-east-1 EC2/RDS stack with Cloudflare Tunnel ingress and SSM SecureString runtime secrets. Error tracking via Bugsink (project employed-api, errors.xibodev.com); Gatus monitors apex/market hosts and API health. Resume PDFs persist to Cloudflare R2 bucket employed-prod-resumes."
 }

@@ -1,4 +1,4 @@
-<!-- last_verified: 2026-06-27T00:00:00Z| git_ref: master| verified_by: prod documentation refresh -->
+<!-- last_verified: 2026-06-28T00:00:00Z| git_ref: master| verified_by: prod documentation refresh -->
 
 # Employed — Services
 
@@ -30,6 +30,9 @@ Employed is a multilingual hiring platform for Mozambique and Mexico. Companies 
 | Redis | EC2 Compose sidecar |
 | Email | AWS SES for `joinemployed.com`, sender `noreply@joinemployed.com` |
 | Secrets | SSM SecureStrings under `/employed/prod/*` |
+| Resume storage | Durable Cloudflare R2 bucket `employed-prod-resumes` (boto3); local fallback for dev/test |
+| Error tracking | Bugsink project `employed-api` at `https://errors.xibodev.com`, environment `production` |
+| Uptime | Gatus monitors apex/market hosts and API health |
 | UAT | old shared-VPS deployment is retired; `deploy-uat.yml` is disabled |
 
 ## Hosts and market behavior
@@ -50,8 +53,8 @@ Employed is a multilingual hiring platform for Mozambique and Mexico. Companies 
 | M-Pesa / e-Mola | Simulator mode |
 | Google OAuth | Web client covers apex/www origins and `https://api.joinemployed.com/auth/oauth/google/callback` |
 | reCAPTCHA v3 | Domain `joinemployed.com` |
-| Bugsink | Standard error sink; `SENTRY_DSN` is empty so SDKs no-op |
-| Gatus | Standard uptime monitor; production URL checks are not wired yet |
+| Bugsink | Live error tracking; project `employed-api` (id 11) at `https://errors.xibodev.com`; backend `SENTRY_DSN` set in SSM, environment `production` |
+| Gatus | Live uptime monitoring; atlas-driven group "Employed" covers `joinemployed.com`, `www`/`mx`/`mz`, and `api.joinemployed.com/health` |
 
 ## CI/CD
 
@@ -64,8 +67,6 @@ Employed is a multilingual hiring platform for Mozambique and Mexico. Companies 
 
 ## Open operational follow-ups
 
-- Set Bugsink DSNs and `SENTRY_ENVIRONMENT=production`.
-- Add Gatus checks for `joinemployed.com` and `api.joinemployed.com/health`.
 - Add Google OAuth/reCAPTCHA coverage for `mx.joinemployed.com` and `mz.joinemployed.com` if those hosts require direct sign-in flows.
 - Switch Stripe from test mode to live keys when monetisation starts.
-- Move resume artifacts to persistent media storage when durable PDFs are required.
+- Add a user-facing resume download endpoint; the durable R2 storage layer exists but no serve route is wired yet.

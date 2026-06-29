@@ -1,5 +1,5 @@
 ---
-last_verified: 2026-06-27T00:00:00Z
+last_verified: 2026-06-28T00:00:00Z
 git_ref: master
 verified_by: prod documentation refresh
 ---
@@ -45,7 +45,7 @@ browser
                                                             RDS PostgreSQL 17
 ```
 
-Resume PDF artifacts write to local `RESUME_ARTIFACT_DIR` on the EC2 host. Employed has no production application object-storage bucket. The only S3 bucket in production is `employed-prod-deploy-assets-*`, used for deploy asset delivery to the EC2 instance.
+Resume PDF artifacts persist durably to Cloudflare R2 bucket `employed-prod-resumes` (boto3, `RESUME_STORAGE_BACKEND=r2`), with a local-disk fallback for dev/test. The S3 bucket `employed-prod-deploy-assets-*` is used only for deploy asset delivery to the EC2 instance.
 
 ## AWS infrastructure
 
@@ -61,7 +61,7 @@ Five CDK stacks define production:
 | `Employed-Budget-prod` | $80/month product budget with tiered alerts and a deny-new-spend deploy-role policy at 100% |
 | `Employed-Compute-prod` | EC2 `t4g.small` with IMDSv2, ECR pull, SSM read, SES send, deploy-assets S3 read, and `bootstrap.sh` user data |
 
-Every resource is tagged `Product=employed`, `CostCenter=employed-prod`, `Env=prod`, `ManagedBy=cdk`.
+All 61 Employed resources are tagged `Product=employed`, `CostCenter=employed-prod`, `Env=prod`, `ManagedBy=cdk`. A CDK aspect `TagLaunchTemplateLaunchedResources` (`infrastructure/app.py`) applies these tags to launch-template instance/volume/ENI. The API uvicorn runs with `--proxy-headers --forwarded-allow-ips=*` behind Cloudflare Tunnel.
 
 ## Images
 
@@ -86,4 +86,4 @@ Runtime secrets are SSM SecureStrings under `/employed/prod/*`. `deploy/ec2/rend
 
 ## Observability
 
-`SENTRY_DSN` is the Bugsink-compatible error-tracking hook. It is empty in production, so SDKs no-op. Gatus is the uptime standard; production URL monitors are still an operational follow-up.
+`SENTRY_DSN` is the Bugsink-compatible error-tracking hook. The backend DSN is set in SSM and Sentry initialises in `production` (project `employed-api` at `https://errors.xibodev.com`). Gatus monitors `joinemployed.com`, www/mx/mz, and `api.joinemployed.com/health`.

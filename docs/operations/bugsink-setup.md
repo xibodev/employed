@@ -1,14 +1,15 @@
-<!-- last_verified: 2026-06-27T00:00:00Z| git_ref: master| verified_by: prod documentation refresh -->
+<!-- last_verified: 2026-06-28T00:00:00Z| git_ref: master| verified_by: prod documentation refresh -->
 
 # Error Tracking Setup — Bugsink
 
-Bugsink is the error-tracking standard. Employed uses Sentry-SDK-compatible clients and sends events only when `SENTRY_DSN` is set.
+Bugsink is the error-tracking standard. Employed uses Sentry-SDK-compatible clients that send events when `SENTRY_DSN` is set.
 
 ## Current state
 
-- Backend `sentry-sdk[fastapi]` wiring exists.
-- Frontend `@sentry/nextjs` wiring exists.
-- Production `SENTRY_DSN` is empty, so both SDKs no-op.
+- Bugsink project `employed-api` (id 11) is live at `https://errors.xibodev.com`.
+- Backend `sentry-sdk[fastapi]` is initialised in `production` (`observability.sentry: initialised environment=production`). `jinja2` is pinned in `requirements-api.txt` because the Sentry FastAPI integration requires it.
+- Frontend `@sentry/nextjs` wiring exists and is DSN-gated.
+- Production backend `SENTRY_DSN` is stored in SSM `/employed/prod/SENTRY_DSN`; error tracking is active.
 
 ## Required env
 

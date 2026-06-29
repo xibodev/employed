@@ -1,4 +1,4 @@
-<!-- last_verified: 2026-06-27T00:00:00Z| git_ref: master| verified_by: prod documentation refresh -->
+<!-- last_verified: 2026-06-28T00:00:00Z| git_ref: master| verified_by: prod documentation refresh -->
 
 # Employed - Architecture Notes
 
@@ -14,7 +14,8 @@ Employed is a trust-centric, integration-ready hiring platform for Mozambique (M
 - Database: encrypted, deletion-protected RDS PostgreSQL 17 (`db.t4g.micro`, Single-AZ, gp3 20 GB) in private subnets.
 - Secrets: SSM Parameter Store SecureStrings under `/employed/prod/*`; no application secrets are stored in the repo.
 - Email: AWS SES for `joinemployed.com`, sender `noreply@joinemployed.com`.
-- Observability standard: Bugsink via `SENTRY_DSN` and Gatus uptime checks. Both are the house standard; production URL monitors/DSN are still open operational items.
+- Observability: Bugsink error tracking is live (`SENTRY_DSN` set in SSM, project `employed-api`); Gatus monitors apex/market hosts and API health.
+- Storage: resume PDFs persist to Cloudflare R2 bucket `employed-prod-resumes`.
 
 ## Technology stack
 

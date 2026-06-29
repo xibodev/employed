@@ -1,5 +1,5 @@
 ---
-last_verified: 2026-06-27T00:00:00Z
+last_verified: 2026-06-28T00:00:00Z
 git_ref: master
 verified_by: prod documentation refresh
 ---
@@ -73,7 +73,7 @@ Environment variable reference for the FastAPI backend and Next.js frontend. Pro
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `SENTRY_DSN` | no | Bugsink DSN; empty means no-op |
+| `SENTRY_DSN` | no | Bugsink DSN; set in prod, error tracking active |
 | `NEXT_PUBLIC_SENTRY_DSN` | no | browser Bugsink DSN if enabled |
 | `SENTRY_ENVIRONMENT` | no | `production` in prod |
 | `SENTRY_TRACES_SAMPLE_RATE` | no | optional tracing sample rate |
@@ -82,4 +82,6 @@ Environment variable reference for the FastAPI backend and Next.js frontend. Pro
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `RESUME_ARTIFACT_DIR` | no | local resume PDF artifact directory; ephemeral on EC2 |
+| `RESUME_STORAGE_BACKEND` | no | `r2` in prod; `local` fallback for dev/test |
+| `RESUME_S3_BUCKET` / `RESUME_S3_ENDPOINT_URL` / `RESUME_S3_ACCESS_KEY_ID` / `RESUME_S3_SECRET_ACCESS_KEY` / `RESUME_S3_REGION` | r2 mode | Cloudflare R2 bucket `employed-prod-resumes` |
+| `RESUME_ARTIFACT_DIR` | no | local resume PDF directory for dev/test fallback |

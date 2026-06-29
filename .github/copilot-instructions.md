@@ -11,7 +11,7 @@ Production is live at `joinemployed.com`. The Vercel frontend serves `joinemploy
 1. **No AI authorship trailers** — no `Co-Authored-By` lines and no generated-by footers.
 2. **Never paste credentials** — reference names and paths, not values.
 3. **Locale codes** — `en`, `pt`, `es` only.
-4. **Env var naming** — use standard names: `SENTRY_DSN`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `FROM_EMAIL`, `NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_APP_URL`, `FRONTEND_BASE_URL`, `RESUME_ARTIFACT_DIR`.
+4. **Env var naming** — use standard names: `SENTRY_DSN`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `FROM_EMAIL`, `NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_APP_URL`, `FRONTEND_BASE_URL`, `RESUME_STORAGE_BACKEND`, `RESUME_S3_BUCKET`.
 5. **Secrets posture** — production secrets are SSM SecureStrings under `/employed/prod/*`; required names are in `deploy/ec2/required-secrets.txt`.
 6. **Runtime config** — mutable domain/provider values are config, not source constants.
 

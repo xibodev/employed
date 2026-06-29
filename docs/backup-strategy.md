@@ -1,5 +1,5 @@
 ---
-last_verified: 2026-06-27T00:00:00Z
+last_verified: 2026-06-28T00:00:00Z
 git_ref: master
 verified_by: prod documentation refresh
 ---
@@ -12,7 +12,7 @@ verified_by: prod documentation refresh
 |-------|-----------------|-------|
 | RDS PostgreSQL 17 | RDS automated backups/snapshots; optional encrypted logical dumps | Primary business data |
 | Redis sidecar | no backup | Queue/rate-limit/revocation/replay state is ephemeral |
-| Resume artifacts | no durable backup | Local EC2 artifacts are ephemeral until persistent media is added |
+| Resume artifacts | durable on R2 | Cloudflare R2 bucket `employed-prod-resumes` retains PDFs; bucket-level versioning/lifecycle policy is operator-managed |
 | Stripe events | provider retained | Use Stripe dashboard/API for replay/evidence |
 | Deploy assets bucket | reproducible from repo | Used only for deployment plumbing |
 

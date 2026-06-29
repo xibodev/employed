@@ -1,5 +1,5 @@
 ---
-last_verified: 2026-06-27T00:00:00Z
+last_verified: 2026-06-28T00:00:00Z
 git_ref: master
 verified_by: prod documentation refresh
 ---
@@ -51,4 +51,4 @@ PostgreSQL is the system of record. Alembic migrations `001`-`005` are append-on
 
 ## External integrations
 
-AWS SES sends transactional email. Stripe is configured in test mode. M-Pesa and e-Mola are simulator-mode. Google OAuth and reCAPTCHA v3 are configured for `joinemployed.com`. Bugsink and Gatus are the observability standards; production wiring remains an operational follow-up.
+AWS SES sends transactional email. Stripe is configured in test mode. M-Pesa and e-Mola are simulator-mode. Google OAuth and reCAPTCHA v3 are configured for `joinemployed.com`. Bugsink error tracking is live (project `employed-api`, backend DSN set) and Gatus monitors apex/market hosts and API health. Resume PDFs persist to Cloudflare R2 bucket `employed-prod-resumes`.

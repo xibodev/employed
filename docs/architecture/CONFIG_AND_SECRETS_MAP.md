@@ -1,5 +1,5 @@
 ---
-last_verified: 2026-06-27T00:00:00Z
+last_verified: 2026-06-28T00:00:00Z
 git_ref: master
 verified_by: prod documentation refresh
 ---
@@ -50,8 +50,10 @@ Production runtime configuration lives in SSM Parameter Store under `/employed/p
 | `RECAPTCHA_SECRET_KEY` / `NEXT_PUBLIC_RECAPTCHA_SITE_KEY` | bot protection | reCAPTCHA v3 |
 | `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET` / `STRIPE_PUBLISHABLE_KEY` | payments | Stripe test mode |
 | `SMTP_HOST` / `SMTP_PORT` / `SMTP_USERNAME` / `SMTP_PASSWORD` / `SMTP_USE_TLS` / `FROM_EMAIL` | email | AWS SES, sender `noreply@joinemployed.com` |
-| `RESUME_ARTIFACT_DIR` | arq resume PDF task | local ephemeral directory on EC2 |
-| `SENTRY_DSN` / `SENTRY_ENVIRONMENT` / `SENTRY_TRACES_SAMPLE_RATE` | Bugsink-compatible SDKs | DSN empty means no-op |
+| `RESUME_STORAGE_BACKEND` | resume storage selector | `r2` in prod; defaults to local for dev/test |
+| `RESUME_S3_BUCKET` / `RESUME_S3_ENDPOINT_URL` / `RESUME_S3_ACCESS_KEY_ID` / `RESUME_S3_SECRET_ACCESS_KEY` / `RESUME_S3_REGION` | Cloudflare R2 (boto3) | resume PDFs upload to bucket `employed-prod-resumes` |
+| `RESUME_ARTIFACT_DIR` | arq resume PDF task | local dev/test fallback path |
+| `SENTRY_DSN` / `SENTRY_ENVIRONMENT` / `SENTRY_TRACES_SAMPLE_RATE` | Bugsink-compatible SDKs | backend DSN set in SSM; initialises in `production` |
 
 ## Vercel build-time env
 

@@ -1,7 +1,7 @@
 # Employed — Product Positioning
 
 ```yaml
-last_verified: 2026-06-27T00:00:00Z
+last_verified: 2026-06-28T00:00:00Z
 git_ref: master
 verified_by: prod documentation refresh
 ```

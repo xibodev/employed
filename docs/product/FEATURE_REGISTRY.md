@@ -1,7 +1,7 @@
 # Employed — Feature Registry
 
 ```yaml
-last_verified: 2026-06-27T00:00:00Z
+last_verified: 2026-06-28T00:00:00Z
 git_ref: master
 verified_by: prod documentation refresh
 ```
@@ -25,12 +25,14 @@ Statuses use: `planned`, `in_progress`, `implemented`, `tested_locally`, `uat_re
 | EMP-F-011 | Stripe featured-listing payments | `deployed_to_uat` | Stripe adapter and test-mode webhook are configured |
 | EMP-F-012 | M-Pesa/e-Mola payment options | `implemented` | Simulator adapters are present; real provider mode is not active |
 | EMP-F-013 | AWS production deployment | `deployed_to_uat` | CDK stacks, ECR image, EC2 Compose runtime, RDS, and Vercel production frontend are current topology |
-| EMP-F-014 | Bugsink error tracking | `blocked` | SDKs are wired; DSN is not set |
-| EMP-F-015 | Gatus uptime monitoring | `blocked` | Standard is selected; production checks are not wired |
-| EMP-F-016 | Persistent resume media | `planned` | Resume artifacts are local/ephemeral until R2 or another durable store is added |
+| EMP-F-014 | Bugsink error tracking | `live` | Project `employed-api` at errors.xibodev.com; backend DSN set, env production |
+| EMP-F-015 | Gatus uptime monitoring | `live` | Monitors apex, market hosts, and API health |
+| EMP-F-016 | Durable resume storage | `implemented` | Resume PDFs persist to R2 bucket `employed-prod-resumes`; user-facing download route is backlog |
 
 ## Status rules
 
 - `deployed_to_uat` means the feature is present in the deployable production branch and belongs to the live product surface.
+- `live` means the feature is wired and operating in production.
+- `implemented` means the code path exists and is exercised, even if a downstream surface is still backlog.
 - `blocked` names an external or operator dependency.
 - `planned` names work with no committed implementation.
